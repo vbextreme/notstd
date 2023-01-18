@@ -54,6 +54,7 @@ __private void swap_(char* restrict a, char* restrict b, size_t size){
 int memswap(void* restrict a, size_t sizeA, void* restrict b, size_t sizeB){
 	if( !a || !b || !sizeA || !sizeB ){
 		dbg_error("unable swap %p and %p", a, b);
+		errno = EINVAL;
 		return -1;
 	}
 
@@ -85,9 +86,13 @@ int memswap(void* restrict a, size_t sizeA, void* restrict b, size_t sizeB){
 	return 0;
 }
 
-int mem_swap(void* restrict a, void* restrict b){
+int mem_swap(void* restrict a, size_t sza, void* restrict b, size_t szb){
 	size_t sa = mem_size(a);
 	size_t sb = mem_size(b);
-	if( sa != sb ) return -1;
+	if( sza > sb || szb > sa ){
+		dbg_error("destination size is to small");
+		errno = EINVAL;
+		return -1;
+	}
 	return memswap(a, mem_size(a), b, mem_size(b));
 }

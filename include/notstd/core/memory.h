@@ -89,7 +89,7 @@ mProtect_s* mem_protect(mProtect_s* mp, unsigned mode);
 /* extras.c */
 /************/
 int memswap(void* restrict a, size_t sizeA, void* restrict b, size_t sizeB);
-int mem_swap(void* restrict a, void* restrict b);
+int mem_swap(void* restrict a, size_t sza, void* restrict b, size_t szb);
 
 
 #endif
