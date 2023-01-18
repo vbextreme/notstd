@@ -1,0 +1,8 @@
+#!/bin/bash
+cd build
+meson configure -Dut='delay'
+ninja clean
+ninja 
+
+valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no\
+   	./notstd

@@ -1,0 +1,7 @@
+#!/bin/bash
+cd build
+meson configure -Dut='delay'
+ninja clean
+ninja scan-build
+
+
