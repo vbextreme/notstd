@@ -99,8 +99,7 @@ __private void lock_write(hmem_s* hm){
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-// memory manager, create arena for memory <= 2048 and use lock/unlock for sync.
-// for memory > 2048 direct use of mmap
+// memory manager
 
 
 __private void* memory_page(size_t size, unsigned flags, int file){
@@ -182,7 +181,7 @@ __malloc void* mem_alloc(size_t size, unsigned extend, unsigned flags, const cha
 	hm->extend  = extend;
 	hm->name    = len;
 	hm->cleanup = NULL;
-	hm->refs    = 0;
+	hm->refs    = 1;
 	hm->childs  = NULL;
 	hm->flags   = hflags;
 	hm->size    = size;
@@ -230,7 +229,7 @@ void* mem_realloc(void* mem, size_t size){
 	return HMEM_MEM(hm);
 }
 
-void* mem_link(void* child, void* parent){
+void* mem_borrowed(void* child, void* parent){
 	hmem_s* hchild = MEM_HMEM(child);
 	hmem_s* hparent = MEM_HMEM(parent);
 	iassert( HMEM_CHECK(hchild) );
@@ -245,14 +244,25 @@ void* mem_link(void* child, void* parent){
 	return child;
 }
 
-void* mem_unlink(void* child, void* parent){
+void* mem_gift(void* child, void* parent){
 	hmem_s* hchild = MEM_HMEM(child);
 	hmem_s* hparent = MEM_HMEM(parent);
 	iassert( HMEM_CHECK(hchild) );
 	iassert( HMEM_CHECK(hparent));
 
-	iassert(hchild->refs);
-	--hchild->refs;
+	memLink_s* ml = malloc(sizeof(memLink_s));
+	ml->hm = hchild;
+	ml->next = hparent->childs;
+	hparent->childs = ml;
+
+	return child;
+}
+
+void* mem_give(void* child, void* parent){
+	hmem_s* hchild = MEM_HMEM(child);
+	hmem_s* hparent = MEM_HMEM(parent);
+	iassert( HMEM_CHECK(hchild) );
+	iassert( HMEM_CHECK(hparent));
 
 	memLink_s** ml = &hparent->childs;
 	for(; (*ml); ml = &(*ml)->next ){
@@ -260,24 +270,24 @@ void* mem_unlink(void* child, void* parent){
 			void* tofree = *ml;
 			*ml = (*ml)->next;
 			free(tofree);
-			break;
+			return child;
 		}
 	}
 
-	return child;
+	die("tried to give memory that you dont have");
+	return NULL;
 }
 
 __private void hmem_free(hmem_s* hm){
 	// dont free if memory are references from others memory
-	if( hm->refs ) return;
+	iassert( hm->refs );
+	if( --hm->refs ) return;
 
 	// as long the children not removed
 	memLink_s* next;
 	while( hm->childs ){
 		next = hm->childs->next;
 		memLink_s* tofree = hm->childs;
-		iassert(hm->childs->hm->refs);
-		--hm->childs->hm->refs;
 		hmem_free(hm->childs->hm);
 		hm->childs = next;
 		free(tofree);
@@ -415,26 +425,26 @@ struct superblocks{
 };
 
 typedef struct sbextend{
-	superblocks_s* sb;
+	superblocks_t* sb;
 }sbextend_s;
 
-__private void msb_allocate(superblocks_s* sb){
+__private void msb_allocate(superblocks_t* sb){
 	void* page = mem_alloc(sb->raw * sb->count, sizeof(sbextend_s), MEM_FLAG_PAGE, NULL, 0, 0);
-	mem_link(page, sb);
+	mem_gift(page, sb);
 	sbextend_s* ext = mem_extend(page);
 	ext->sb = sb;
 	sb->current = (uintptr_t)page;
 	sb->allocated = 0;
 }
 
-__private void msb_deallocate(superblocks_s* sb, hmem_s* hm){
+__private void msb_deallocate(superblocks_t* sb, hmem_s* hm){
 	iassert( !hm->childs );
 	hm->childs = (void*)sb->free;
 	sb->free = hm;
 }
 
-superblocks_s* msb_new(unsigned sof, unsigned count, mcleanup_f clean){
-	superblocks_s* sb = NEW(superblocks_s);
+superblocks_t* msb_new(unsigned sof, unsigned count, mcleanup_f clean){
+	superblocks_t* sb = NEW(superblocks_t);
 	sb->sof       = ROUND_UP(sof, sizeof(uintptr_t));
 	sb->raw       = ROUND_UP(sb->sof + sizeof(hmem_s) + sizeof(sbextend_s), sizeof(uintptr_t));
 	sb->count     = count;
@@ -452,7 +462,7 @@ __private void msb_clean(void* addr){
 	msb_deallocate(ext->sb, hm);
 }
 
-__malloc void* msb_alloc(superblocks_s* sb){
+__malloc void* msb_alloc(superblocks_t* sb){
 	if( sb->free ){
 		void* ret = HMEM_MEM(sb->free);
 		hmem_s* next = (hmem_s*)sb->free->childs;
@@ -470,7 +480,6 @@ __malloc void* msb_alloc(superblocks_s* sb){
 	++sb->allocated;
 	return ret;
 }
-
 
 
 

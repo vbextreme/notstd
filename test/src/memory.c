@@ -47,7 +47,7 @@ int ut_raii(void){
 int ut_block(void){
 	int* tmp[BN];
 	dbg_info("test block");
-	superblocks_s* sb = msb_new(sizeof(int), 8, NULL);
+	superblocks_t* sb = msb_new(sizeof(int), 8, NULL);
 	dbg_info("allocate 4 blocks");
 	for( unsigned i = 0; i < 4; ++i ){
 		tmp[i] = msb_alloc(sb);
