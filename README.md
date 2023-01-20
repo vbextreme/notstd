@@ -15,7 +15,7 @@ nothing for now
 
 To test it:
 ==============
-ut can use with: 'memory', 'delay'<br><br>
+ut can use with: 'memory', 'delay', 'datastructure'<br><br>
 
 $ meson setup build<br>
 $ cd build<br>
