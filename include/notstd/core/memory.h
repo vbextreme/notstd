@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <notstd/core/compiler.h>
 
+//is not threads safe
+
 //calcolate header size
 #define MEM_HEADER_SIZE(NAME,EXTEND) (48 + ROUND_UP(NAME, sizeof(uintptr_t)) + ROUND_UP(NAME, sizeof(uintptr_t)))
 
@@ -293,20 +295,6 @@ void mem_cleanup(void* addr, mcleanup_f fn);
 
 //unlink shared memory
 void mem_shared_unlink(void* addr, int mode);
-
-//when need to alloc/free many time one type of object, probably you want use superblocks.
-//superbloks is little more fast than mem_alloc and when free superblock release all memory have allocated with this
-//sof, is sizeof one object
-//count, starting elements, auto increase memory when NOBJECT > COUNT
-//clean, a cleanup function for each element
-//exaples:
-//__free superblocks_s* sb = msb_new(sizeof(int), 128, NULL);
-//int* i = msb_alloc(sb);
-//int* b = msb_alloc(sb);
-//mem_free(i);
-//mem_free(b);
-superblocks_t* msb_new(unsigned sof, unsigned count, mcleanup_f clean);
-__malloc void* msb_alloc(superblocks_t* sb);
 
 /*************/
 /* protect.c */

@@ -43,35 +43,6 @@ int ut_raii(void){
 	return 0;
 }
 
-#define BN (4096*10)
-int ut_block(void){
-	int* tmp[BN];
-	dbg_info("test block");
-	superblocks_t* sb = msb_new(sizeof(int), 8, NULL);
-	dbg_info("allocate 4 blocks");
-	for( unsigned i = 0; i < 4; ++i ){
-		tmp[i] = msb_alloc(sb);
-		*tmp[i] = 123;
-	}
-	dbg_info("free 4 blocks");
-	for( unsigned i = 0; i < 4; ++i ){
-		mem_free(tmp[i]);
-	}
-	dbg_info("allocate %u blocks", BN);
-	for( unsigned i = 0; i < BN; ++i ){
-		tmp[i] = msb_alloc(sb);
-		*tmp[i] = 123456;
-	}
-	dbg_info("free %u blocks", BN);
-	for( unsigned i = 0; i < BN; ++i ){
-		mem_free(tmp[i]);
-	}
-	dbg_info("free superblocks");
-	mem_free(sb);
-
-	return 0;
-}
-
 __private char* scp(__out char* restrict d, const char* restrict s){
 	while( (*d++ = *s++) );
 	return --d;
@@ -126,10 +97,21 @@ int ut_lock(void){
 	return 0;
 }
 
+void uc_swap(void){
+	__free char* a = MANY(char, 80);
+	__free char* b = MANY(char, 80);
+	strcpy(a, "hello");
+	strcpy(b, "world");
+
+	dbg_info("%s swap %s", a, b);
+	mem_swap(a, strlen(a), b, strlen(b));
+	dbg_info("%s <> %s", a, b);
+}
+
 int main(){
 	ut_new();
 	ut_raii();
-	ut_block();
 	ut_lock();
+	uc_swap();
 	return 0;
 }
