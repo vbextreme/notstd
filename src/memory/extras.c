@@ -1,3 +1,7 @@
+#ifndef MEMORY_DEBUG
+#undef DBG_ENABLE
+#endif
+
 #include <notstd/core.h>
 
 /////////////////////////////////////

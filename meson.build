@@ -30,13 +30,8 @@ src += [ 'src/memory/extras.c' ]
 
 src += [ 'src/concurrency/futex.c' ]
 
-#src += [ 'src/core/optex.c' ]
-#src += [ 'src/err.c' ]
-#src += [ 'src/page.c', 'src/memory.c', 'src/protect.c' ]
-#src += [ 'src/futex.c' ]
-#src += [ 'src/math.c' ]
-#src += [ 'src/delay.c' ]
-#src += [ 'src/vector.c' ]
+src += [ 'src/datastructure/vector.c' ]
+
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
 #src += [ 'src/rbhash.c', 'src/hashalg.c' ]
@@ -50,21 +45,23 @@ src += [ 'src/concurrency/futex.c' ]
 #src += [ 'src/process.c' ]
 #src += [ 'src/path.c', 'src/dir.c', 'src/fd.c', 'src/file.c', 'src/request.c', 'src/fgeneric.c', 'src/f.c' ]
 
-#src += [ 'test/src/main.c' ]
-
 ut = get_option('ut')
 if ut == 'memory' 
   message('testing memory')
   src += [ 'test/src/memory.c' ]
   type = 'executable'
+  add_global_arguments('-DMEMORY_DEBUG=1', language: 'c')
 elif ut == 'delay'
   message('testing delay')
   src += [ 'test/src/delay.c' ]
   type = 'executable'
+  add_global_arguments('-DDELAY_DEBUG=1', language: 'c')
 elif ut == 'datastructure'
   message('testing datastructure')
   src += [ 'test/src/datastructure.c' ]
+  src += [ 'test/src/vector.c' ]
   type = 'executable'
+  add_global_arguments('-DDS_DEBUG=1', language: 'c')
 endif
 
 ##############
