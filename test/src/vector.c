@@ -17,15 +17,19 @@ void uc_vector(){
 	foreach_vector(arr, i){
 		dbg_info("%d", arr[i]);
 	}
-
+	dbg_info("");
+	
 	dbg_info("sort");
 	vector_qsort(&arr, dcre);
 	foreach_vector(arr, i){
 		dbg_info("%d", arr[i]);
 	}
+	dbg_info("");
+
 	dbg_info("shuffle");
-	vector_shuffle(&arr, 0, vector_count(arr)-1);
+	vector_shuffle(&arr, 0, vector_count(&arr)-1);
 	foreach_vector(arr, i){
 		dbg_info("%d", arr[i]);
 	}
+	dbg_info("");
 }
