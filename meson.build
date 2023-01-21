@@ -31,6 +31,7 @@ src += [ 'src/memory/extras.c' ]
 src += [ 'src/concurrency/futex.c' ]
 
 src += [ 'src/datastructure/vector.c' ]
+src += [ 'src/datastructure/list.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -60,6 +61,7 @@ elif ut == 'datastructure'
   message('testing datastructure')
   src += [ 'test/src/datastructure.c' ]
   src += [ 'test/src/vector.c' ]
+  src += [ 'test/src/list.c' ]
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
 endif

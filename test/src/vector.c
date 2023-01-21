@@ -7,8 +7,8 @@ int dcre(const void* A, const void* B){
 
 void uc_vector(){
 	mth_random_begin();
-	int* arr = VECTOR(int, 4);
-	for( unsigned i = 0; i < 32; ++i ){
+	__free int* arr = VECTOR(int, 4);
+	for( unsigned i = 0; i < 16; ++i ){
 		int r = mth_random(4096);
 		vector_push(&arr, &r);
 	}
