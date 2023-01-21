@@ -1,8 +1,10 @@
-notstd v0.0.0
+notstd v0.0.2
 ====================
 
 State:
 ======
+* v0.0.2 add list
+* v0.0.1 add vector
 * v0.0.0 add macro, math && memory
 
 Bug:

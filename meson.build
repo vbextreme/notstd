@@ -1,7 +1,7 @@
 ###########
 # project #
 ###########
-project('notstd', 'c', version: '0.0.0')
+project('notstd', 'c', version: '0.0.2')
 
 cc = meson.get_compiler('c')
 
