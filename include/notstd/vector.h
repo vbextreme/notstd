@@ -39,7 +39,12 @@ typedef struct vextend{
 #define VECTOR(TYPE, COUNT) (TYPE*)vector_new(sizeof(TYPE), COUNT)
 
 //iterate over vector
-#define foreach_vector(V, IT) for( size_t IT = 0; IT < vector_count(V); ++IT )
+//this is only function than not need to call with &
+//int* a = .....;
+//vector_foreach(a, i){
+//  printf("%d\n", a[i]);
+//}
+#define foreach_vector(V, IT) for( size_t IT = 0; IT < vector_count(&V); ++IT )
 
 //create new vector, sof is size of element, count is how many memory reserved for vector, can increade or decrease, return always a valid pointer
 void* vector_new(size_t sof, size_t count);
