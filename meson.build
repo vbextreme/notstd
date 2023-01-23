@@ -1,7 +1,7 @@
 ###########
 # project #
 ###########
-project('notstd', 'c', version: '0.0.3')
+project('notstd', 'c', version: '0.0.4')
 
 cc = meson.get_compiler('c')
 
@@ -33,6 +33,7 @@ src += [ 'src/concurrency/futex.c' ]
 src += [ 'src/datastructure/vector.c' ]
 src += [ 'src/datastructure/list.c' ]
 src += [ 'src/datastructure/hashalg.c' , 'src/datastructure/rbhash.c' ]
+src += [ 'src/datastructure/fzs.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -64,6 +65,7 @@ elif ut == 'datastructure'
   src += [ 'test/src/vector.c' ]
   src += [ 'test/src/list.c' ]
   src += [ 'test/src/hash.c' ]
+  src += [ 'test/src/fzs.c' ]
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
 endif

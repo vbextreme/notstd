@@ -3,6 +3,7 @@ notstd v0.0.2
 
 State:
 ======
+* v0.0.4 add fuzzy search
 * v0.0.3 add robin hood hash
 * v0.0.2 add list
 * v0.0.1 add vector
