@@ -582,5 +582,18 @@ __const uint16_t crc16n(void* v, size_t size, uint16_t crc){
     return crc;
 }
 
+int mth_approx_eq(double a, double b, double precision){
+	return fabs(a-b) < precision ? 1 : 0;
+}
+
+
+
+
+
+
+
+
+
+
 
 

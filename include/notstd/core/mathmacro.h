@@ -16,6 +16,10 @@
 #define MIN(A,B) ((A<B)?A:B)
 #define MIN3(A,B,C) MTH_MIN(MTH_MIN(A,B),C)
 
+#define P²(N) ({ typeof(N) A = (N); A*A; })
+#define P³(N) ({ typeof(N) A = (N); A*A*A; })
+#define Pⁿ pow
+
 #define ROUND_UP(N,S) ((((N)+(S)-1)/(S))*(S))
 
 #define ROUND_UP_POW_TWO32(N) ({\
