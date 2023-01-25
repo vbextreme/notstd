@@ -45,6 +45,15 @@ void* vector_upsize(void* v, size_t count){
 	return *pv;
 }
 
+void* vector_reserve(void* v, size_t count){
+	void** pv = v;
+	iassert(pv && *pv);
+	vextend_s* ve = mem_extend(*pv);
+	UPSIZE(ve, pv, count);
+	ve->count += count;
+	return *pv;
+}
+
 void* vector_shrink(void* v){
 	void** pv = v;
 	iassert(pv && *pv);

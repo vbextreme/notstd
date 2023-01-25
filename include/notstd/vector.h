@@ -67,6 +67,9 @@ void* vector_resize(void* v, size_t count);
 //check if you max size can countains count elements(if vector_count + count > vector_lenght), otherwise increment the max size, return *v
 void* vector_upsize(void* v, size_t count);
 
+//reserve count memory, as v.count+=count;
+void* vector_reserve(void* v, size_t count);
+
 //check if you max size is to big, release eccessive max size, return *v
 void* vector_shrink(void* v);
 
