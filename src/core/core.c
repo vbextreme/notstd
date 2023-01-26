@@ -1,4 +1,4 @@
-#include <notstd/file.h>
+#include <notstd/core.h>
 
 __ctor void notstd_begin(void){
 	page_begin();
