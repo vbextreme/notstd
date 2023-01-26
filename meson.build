@@ -1,7 +1,7 @@
 ###########
 # project #
 ###########
-project('notstd', 'c', version: '0.0.4')
+project('notstd', 'c', version: '0.0.5')
 
 cc = meson.get_compiler('c')
 
@@ -68,6 +68,7 @@ elif ut == 'datastructure'
   src += [ 'test/src/fzs.c' ]
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
+  add_global_arguments('-DTEST_DATASTRUCTURE=@0@'.format(get_option('utvalue')), language: 'c')
 endif
 
 ##############

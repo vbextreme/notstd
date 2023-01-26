@@ -7,4 +7,5 @@ option('openmp', type: 'integer', value: '1', description: 'enable openmp')
 option('gprof', type: 'integer', value: '0', description: 'enable gprof')
 option('autovectorization', type: 'integer', value: '1', description: 'enable vectorization')
 option('ut', type: 'string', value: '', description: 'testing')
+option('utvalue', type: 'string', value: '', description: 'testing value')
 

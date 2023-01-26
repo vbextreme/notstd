@@ -23,6 +23,7 @@ size_t fzs_levenshtein(const char *a, const size_t lena, const char *b, const si
 size_t fzs_case_levenshtein(const char *a, size_t lena, const char *b, size_t lenb);
 size_t fzs_damerau_levenshtein(const char *s, size_t lena, const char* t, size_t lenb);
 size_t fzs_case_damerau_levenshtein(const char *s, size_t lena, const char* t, size_t lenb);
+size_t fzs_case_weigth_levenshtein(const char *a, size_t lena, const char* b, size_t lenb);
 
 /** find a element with minimal distance
  * @param v char** 

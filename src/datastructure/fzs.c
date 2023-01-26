@@ -1,10 +1,9 @@
-/* fork of*/
-// MIT licensed.
-// Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
-
 #include "notstd/vector.h"
 #include <notstd/fzs.h>
 
+/* fork of*/
+// MIT licensed.
+// Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
 // Returns a size_t, depicting the difference between `a` and `b`.
 // See <https://en.wikipedia.org/wiki/Levenshtein_distance> for more information.
 size_t fzs_levenshtein(const char *a, size_t lena, const char *b, size_t lenb){
@@ -101,41 +100,6 @@ size_t fzs_case_levenshtein(const char *a, size_t lena, const char *b, size_t le
 	return result;
 }
 
-__private size_t levenstein_rec(const char* str1, unsigned len1, const char* str2, unsigned len2, unsigned x, unsigned y){
-	if( x == len1+1 ) return len2-y+1;
-	if( y == len2+1 ) return len1-x+1;
-	if( str1[x-1] == str2[y-1] ) return levenstein_rec(str1, len1, str2, len2, x + 1, y + 1); 
-	size_t m[3];
-   	m[0] = levenstein_rec(str1, len1, str2, len2, x    , y + 1);
-	m[1] = levenstein_rec(str1, len1, str2, len2, x + 1, y    );
-	m[2] = levenstein_rec(str1, len1, str2, len2, x + 1, y + 1);
-	
-	if( m[0] < m[1] ){
-		if( m[0] < m[2] ) return 1 + m[0];
-		return 1 + m[2];
-	}
-	if( m[1] < m[2] ) return 1 + m[1];
-	return m[2];
-}
-
-size_t fzs_levenshtein_rec(const char *a, size_t lena, const char *b, size_t lenb){
-	return levenstein_rec(a, lena, b, lenb, 1, 1);
-}
-
-ssize_t fzs_vector_find(char** v, unsigned count, const char* str, unsigned lens, fzs_f fn){
-	if( lens == 0 ) lens = strlen(str);
-	size_t min = -1UL;
-	ssize_t index = -1;
-	for( unsigned i = 0; i < count; ++i ){
-		size_t distance = fn(v[i], strlen(v[i]), str, lens);
-		if( distance < min ){
-		   	min =  distance;
-			index = i;
-		}
-	}
-	return index;
-}
-
 //https://stackoverflow.com/questions/10727174/damerau-levenshtein-distance-edit-distance-with-transposition-c-implementation
 #define d(i,j) dd[(i) * (m+2) + (j) ]
 #define min(x,y) ((x) < (y) ? (x) : (y))
@@ -210,6 +174,98 @@ size_t fzs_case_damerau_levenshtein(const char *s, size_t lena, const char* t, s
 #undef min2
 #undef min3
 #undef min4
+
+//vbextreme version, add weight, swap, find in classic
+size_t fzs_case_weigth_levenshtein(const char *a, size_t lena, const char* b, size_t lenb){
+	if( lena > lenb ){
+		swap(a,b);
+		swap(lena, lenb);
+	}
+
+	char chsa[256];
+	char chsb[256];
+	memset(chsa, 0, 256);
+	memset(chsb, 0, 256);
+	for( unsigned i = 0; i < lena; ++i ){
+		++chsa[tolower(b[i])];
+	}
+	for( unsigned i = 0; i < lena; ++i ){
+		++chsb[tolower(b[i])];
+	}
+
+	size_t score = 0;
+
+	for( unsigned i = 0; i < lena; ++i ){
+		int cha = tolower(a[i]);
+		int chb = tolower(b[i]);
+		if( cha != chb ){
+			int cha1 = tolower(a[i+1]);
+			int chb1 = tolower(b[i+1]);
+			if( cha == chb1 ){
+				if( cha1 == chb && cha1 != chb1 ){
+					score += 1;
+					++i;
+				}
+				else if ( chsa[chb] ){
+					--chsa[chb];
+					score += 1;
+				}
+				else{
+					score += 2;
+				}
+			}
+			else if( chb == cha1 ){
+				if ( chsb[cha] ){
+					--chsb[cha];
+					score += 1;
+				}
+				else{
+					score += 2;
+				}
+			}
+			else if( chsa[cha] ){
+				--chsa[cha];
+				score += 1;
+			}
+			else{
+				score += 2;
+			}
+		}
+		else{
+			if( chsa[cha] ) --chsa[cha];
+			if( chsb[chb] ) --chsb[chb];
+		}
+	}
+
+	score += (lenb-lena) * 2;
+	return score;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+ssize_t fzs_vector_find(char** v, unsigned count, const char* str, unsigned lens, fzs_f fn){
+	if( lens == 0 ) lens = strlen(str);
+	size_t min = -1UL;
+	ssize_t index = -1;
+	for( unsigned i = 0; i < count; ++i ){
+		size_t distance = fn(v[i], strlen(v[i]), str, lens);
+		if( distance < min ){
+		   	min =  distance;
+			index = i;
+		}
+	}
+	return index;
+}
 
 __private int fzs_cmp(const void* A, const void* B){
 	const fzs_s* a = (const fzs_s*)A;
