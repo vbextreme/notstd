@@ -1,6 +1,7 @@
 #include <notstd/core.h>
 #include <notstd/fzs.h>
 #include <notstd/vector.h>
+#include <notstd/delay.h>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -76,7 +77,12 @@ void uc_fzs(void){
 	for( unsigned m = 0; m < matchsize; ++m ){
 		printf("search: %s\n", match[m]);
 		//fzs_qsort(words, wordssize, match[m], 0, fzs_case_damerau_levenshtein);
+		fputs("  weight     : ",stdout);
 		fzs_qsort(words, wordssize, match[m], 0, fzs_case_weigth_levenshtein);
+		pres(words);
+		puts("");
+		fputs("  levenshtein: ",stdout);
+		fzs_qsort(words, wordssize, match[m], 0, fzs_case_levenshtein);
 		pres(words);
 		puts("");
 	}
@@ -204,7 +210,44 @@ void uc_fzs_inp(void){
 	while( fs_inp_cmp("> ", "q", fzcmd) );
 }
 
+void uc_fzs_benchmark(void){
+	__free char** cmds  = allcmd();
+	__free fzs_s* fzcmd = fzscmd(cmds);
+	delay_t start, vbx, lev, dam;
+   	
+	puts("benchmarks fzs:");
 
+	fputs("weight: ", stdout);
+	fflush(stdout);
+	start = time_us();
+	foreach_vector(cmds, it){
+		fzs_qsort(fzcmd, vector_count(&fzcmd), cmds[it], strlen(cmds[it]), fzs_case_weigth_levenshtein);
+	}
+	vbx = time_us() - start;
+	puts("successfull");
+	
+	fputs("levenshtein: ", stdout);
+	fflush(stdout);
+	start = time_us();
+	foreach_vector(cmds, it){
+		fzs_qsort(fzcmd, vector_count(&fzcmd), cmds[it], strlen(cmds[it]), fzs_case_levenshtein);
+	}
+	lev = time_us() - start;
+	puts("successfull");
+
+	fputs("damerau: ", stdout);
+	fflush(stdout);
+	start = time_us();
+	foreach_vector(cmds, it){
+		fzs_qsort(fzcmd, vector_count(&fzcmd), cmds[it], strlen(cmds[it]), fzs_case_damerau_levenshtein);
+	}
+	dam = time_us() - start;
+	puts("successfull");
+
+	printf("weight      : %fs\n", (double)vbx / 1000000.0);
+	printf("levenshtein : %fs\n", (double)lev / 1000000.0);
+	printf("damerau     : %fs\n", (double)dam / 1000000.0);
+}
 
 
 

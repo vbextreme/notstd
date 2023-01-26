@@ -182,62 +182,40 @@ size_t fzs_case_weigth_levenshtein(const char *a, size_t lena, const char* b, si
 		swap(lena, lenb);
 	}
 
-	char chsa[256];
-	char chsb[256];
-	memset(chsa, 0, 256);
-	memset(chsb, 0, 256);
-	for( unsigned i = 0; i < lena; ++i ){
-		++chsa[tolower(b[i])];
-	}
-	for( unsigned i = 0; i < lena; ++i ){
-		++chsb[tolower(b[i])];
-	}
-
 	size_t score = 0;
+	unsigned ia = 0;
+	unsigned ib = 0;
 
-	for( unsigned i = 0; i < lena; ++i ){
-		int cha = tolower(a[i]);
-		int chb = tolower(b[i]);
+	for(; ia < lena && ib < lenb; ++ia, ++ib ){
+		int cha = tolower(a[ia]);
+		int chb = tolower(b[ib]);
 		if( cha != chb ){
-			int cha1 = tolower(a[i+1]);
-			int chb1 = tolower(b[i+1]);
+			int cha1 = tolower(a[ia+1]);
+			int chb1 = tolower(b[ib+1]);
 			if( cha == chb1 ){
-				if( cha1 == chb && cha1 != chb1 ){
+				if( cha1 == chb ) {
 					score += 1;
-					++i;
-				}
-				else if ( chsa[chb] ){
-					--chsa[chb];
-					score += 1;
+					++ia;
+					++ib;
 				}
 				else{
+					++ib;
 					score += 2;
 				}
 			}
 			else if( chb == cha1 ){
-				if ( chsb[cha] ){
-					--chsb[cha];
-					score += 1;
-				}
-				else{
-					score += 2;
-				}
-			}
-			else if( chsa[cha] ){
-				--chsa[cha];
-				score += 1;
-			}
-			else{
+				++ia;
 				score += 2;
 			}
-		}
-		else{
-			if( chsa[cha] ) --chsa[cha];
-			if( chsb[chb] ) --chsb[chb];
+			else{
+				score += 3;
+			}
 		}
 	}
 
-	score += (lenb-lena) * 2;
+	if( ia > lena ) ia = lena;
+	if( ib > lenb ) ib = lenb;
+	score += (lenb-lena) * 1;
 	return score;
 }
 

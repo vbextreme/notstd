@@ -13,6 +13,7 @@ void uc_chi_square_hash();
 void uc_rbhash(void);
 void uc_fzs(void);
 void uc_fzs_inp(void);
+void uc_fzs_benchmark(void);
 
 int main(){
 	if( MODE & 0x01 ) uc_vector();
@@ -22,4 +23,5 @@ int main(){
 	if( MODE & 0x10 ) uc_rbhash();
 	if( MODE & 0x20 ) uc_fzs();
 	if( MODE & 0x40 ) uc_fzs_inp();
+	if( MODE & 0x80 ) uc_fzs_benchmark();
 }
