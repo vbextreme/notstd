@@ -1,5 +1,9 @@
-#include <sys/syscall.h>
 #include <notstd/futex.h>
+#include <sys/syscall.h>
+
+#ifndef SYS_futex_waitv
+#error "your kernel is too old, upgrade it, think >= 5.16"
+#endif
 
 int futex_to(int *uaddr, int futex_op, int val, const struct timespec *timeout, int *uaddr2, int val3){
 	return syscall(SYS_futex, uaddr, futex_op, val, timeout, uaddr2, val3);
