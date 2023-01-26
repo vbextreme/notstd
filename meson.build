@@ -150,10 +150,10 @@ endif
 # libraries dependencies #
 ##########################
 libDeps  = [ cc.find_library('m', required : true) ]       # math
-libDeps += [ cc.find_library('rt', required : true) ]      # shared mem
-libDeps += [ cc.find_library('dl', required : true) ]      # dynamic load
-libDeps += [ cc.find_library('uring', required : true) ]   # iouring
-libDeps += [ cc.find_library('pcre2-8', required : true) ] # regex perl
+#libDeps += [ cc.find_library('rt', required : true) ]      # shared mem
+#libDeps += [ cc.find_library('dl', required : true) ]      # dynamic load
+#libDeps += [ cc.find_library('uring', required : true) ]   # iouring
+#libDeps += [ cc.find_library('pcre2-8', required : true) ] # regex perl
 
 #########################
 # software dependencies #
