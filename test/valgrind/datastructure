@@ -1,6 +1,6 @@
 #!/bin/bash
 cd build
-meson configure -Dut='datastructure'
+meson configure -Dut='datastructure' -dutvalue='(~0x0040)'
 ninja clean
 ninja 
 
