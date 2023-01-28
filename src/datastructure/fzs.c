@@ -195,16 +195,16 @@ size_t fzs_case_weigth_levenshtein(const char *a, size_t lena, const char* b, si
 			if( cha == chb1 ){
 				if( cha1 == chb ) {
 					score += 1;
-					++ia;
-					++ib;
+					if( ia < lena - 1 ) ++ia;
+					if( ib < lenb - 1 ) ++ib;
 				}
 				else{
-					++ib;
+					if( ib < lenb - 1 ) ++ib;
 					score += 2;
 				}
 			}
 			else if( chb == cha1 ){
-				++ia;
+				if( ia < lena - 1 ) ++ia;
 				score += 2;
 			}
 			else{
@@ -213,9 +213,8 @@ size_t fzs_case_weigth_levenshtein(const char *a, size_t lena, const char* b, si
 		}
 	}
 
-	if( ia > lena ) ia = lena;
-	if( ib > lenb ) ib = lenb;
-	score += (lenb-lena) * 1;
+	score += (lena-ia) * 1;
+	score += (lenb-ib) * 1;
 	return score;
 }
 
