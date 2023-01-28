@@ -4,7 +4,7 @@
 #define TEST_DATASTRUCTURE 0xFFFF
 #endif
 
-const int MODE=TEST_DATASTRUCTURE;
+const unsigned MODE=TEST_DATASTRUCTURE;
 
 void uc_vector();
 void uc_ls();
