@@ -39,6 +39,7 @@
 #define __resolver(NAME)    __attribute__((ifunc(#NAME)))
 #define __constructor_priority(P) __attribute__((constructor(P)))
 #define __destructor_priority(P)  __attribute__((destructor(P)))
+#define __compatible_type(A,B) __builtin_types_compatible_p(A,B)
 
 #define _TOR_PRIORITY        101
 #define _TOR_PRIORITY_CORE   64

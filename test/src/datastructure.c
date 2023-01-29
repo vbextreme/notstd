@@ -26,5 +26,4 @@ int main(){
 	if( MODE & 0x0040 ) uc_fzs_inp();
 	if( MODE & 0x0080 ) uc_fzs_benchmark();
 	if( MODE & 0x0100 ) uc_phq();
-
 }
