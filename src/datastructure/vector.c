@@ -165,10 +165,16 @@ void vector_shuffle(void* v, size_t begin, size_t end){
 	}
 }
 
-void vector_qsort(void* v, qsort_f fn){
+void vector_qsort(void* v, cmp_f fn){
 	void** pv = v;
 	iassert(pv && *pv);
 	vextend_s* ve = mem_extend(*pv);
 	qsort(*pv, ve->count, ve->sof, fn);
 }
 
+void* vector_bsearch(void* v, void* search, cmp_f fn){
+	void** pv = v;
+	iassert(pv && *pv);
+	vextend_s* ve = mem_extend(*pv);
+	return bsearch(search, *pv, ve->count, ve->sof, fn);
+}

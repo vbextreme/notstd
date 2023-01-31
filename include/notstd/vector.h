@@ -107,6 +107,6 @@ void* vector_pop(void* v, __out void* ret);
 void vector_shuffle(void* v, size_t begin, size_t end);
 
 //sorting vector
-void vector_qsort(void* v, qsort_f fn);
+void vector_qsort(void* v, cmp_f fn);
 
 #endif 

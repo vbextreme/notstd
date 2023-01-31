@@ -25,7 +25,7 @@ typedef uintptr_t align_t;
 	#define DECIMAL64_FORMAT "D"
 #endif
 
-typedef int (*qsort_f)(const void* a, const void* b);
+typedef int (*cmp_f)(const void* a, const void* b);
 
 typedef int err_t;
 typedef enum { FALSE, TRUE } bool_t;
