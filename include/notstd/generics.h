@@ -4,7 +4,7 @@
 #include <notstd/core.h>
 #include <notstd/vector.h>
 
-typedef enum { G_CHAR, G_LONG, G_ULONG, G_FLOAT, G_LSTRING, G_STRING, G_OBJ, G_VECTOR } gtype_e;
+typedef enum { G_UNSET, G_CHAR, G_LONG, G_ULONG, G_FLOAT, G_LSTRING, G_STRING, G_VECTOR, G_OBJ } gtype_e;
 
 typedef struct generic generic_s;
 
@@ -23,6 +23,7 @@ struct generic{
 	};
 };
 
+inline generic_s gi_unset(void) { return (generic_s){ .type = G_UNSET }; }
 inline generic_s gi_char(char v) { return (generic_s){ .type = G_CHAR, .c = v}; }
 inline generic_s gi_int8(int8_t v) { return (generic_s){ .type = G_LONG, .l = v}; }
 inline generic_s gi_int16(int16_t v) { return (generic_s){ .type = G_LONG, .l = v}; }
@@ -60,6 +61,7 @@ inline generic_s gi_vec(generic_s* v) { return (generic_s){ .type = G_VECTOR, .v
 inline int g_print(generic_s g){
 	switch( g.type ){
 		default: return printf("%p", g.obj);
+		case G_UNSET: return printf("unset");
 		case G_CHAR: return printf("%c", g.c);
 		case G_LONG: return printf("%ld", g.l);
 		case G_ULONG: return printf("%lu", g.ul);
@@ -83,6 +85,7 @@ inline int g_print(generic_s g){
 inline int g_dump(generic_s g){
 	switch( g.type ){
 		default: return printf("pointer: %p", g.obj);
+		case G_UNSET: return printf("value unset");
 		case G_CHAR: return printf("char: '%c'", g.c);
 		case G_LONG: return printf("long: %ld", g.l);
 		case G_ULONG: return printf("ulong: %lu", g.ul);
