@@ -1,5 +1,5 @@
-#ifndef __NOTSTD_RBTREE_H__
-#define __NOTSTD_RBTREE_H__
+#ifndef __NOTSTD_CORE_RBTREE_H__
+#define __NOTSTD_CORE_RBTREE_H__
 
 #include <notstd/core.h>
 
@@ -18,6 +18,6 @@ rbtree_t* rbtree_cmp(rbtree_t* t, cmp_f fn);
 rbtNode_t* rbtree_node_new(void* data);
 void* rbtree_node_data(rbtNode_t* n);
 rbtNode_t* rbtree_node_data_set(rbtNode_t* n, void* data);
-void rbtree_dump(rbtree_t* node);
+//void rbtree_dump(rbtree_t* node);
 
 #endif
