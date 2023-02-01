@@ -5,7 +5,7 @@ If you not have Linux you can download and install, same for GCC, i think not ch
 
 State:
 ======
-* v0.0.10 add unset in generic, vector bsearch,
+* v0.0.10 add unset in generic, vector bsearch, rbtree
 * v0.0.9  add generic union type
 * v0.0.8  add priority heap queue
 * v0.0.7  more accurate fzs + benchmark
