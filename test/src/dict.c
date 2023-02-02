@@ -1,9 +1,9 @@
 #include <notstd/dict.h>
 
-__private int pair(generic_s key, generic_s* value, __unused void* arg){
-	g_print(key);
+__private int pair(gpair_s kv, __unused void* arg){
+	g_print(kv.key);
 	fputs(": ", stdout);
-	g_print(*value);
+	g_print(*kv.value);
 	putchar('\n');	
 	return 0;
 }
@@ -20,5 +20,14 @@ void uc_dict(void){
 	*dict(d, "signed") = GI(4);
 	dict(d, "unset value");
 
+	puts("map");
 	map_dict(d, pair, NULL);
+
+	puts("foreach");
+	foreach_dict(d, kv, i){
+		g_print(kv[i].key);
+		fputs(": ", stdout);
+		g_print(*kv[i].value);
+		putchar('\n');	
+	}
 }

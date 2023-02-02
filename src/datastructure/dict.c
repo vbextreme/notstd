@@ -92,7 +92,7 @@ typedef struct maparg{
 __private int tmap(void* data, void* arg){
 	dictE_s* e = data;
 	maparg_s* a = arg;
-	return a->fn(e->key, &e->value, a->ctx);
+	return a->fn((gpair_s){.key = e->key, .value = &e->value}, a->ctx);
 }
 
 void map_dict(dict_t* d, dictMap_f fn, void* arg){
@@ -101,12 +101,22 @@ void map_dict(dict_t* d, dictMap_f fn, void* arg){
 	map_rbtree_inorder(rbtree_node_root(d->stree), tmap, &a);
 }
 
+__private int vmap(void* data, void* arg){
+	dictE_s* e = data;
+	gpair_s** vp = arg;
+	gpair_s* kv = vector_push(vp, NULL);
+	kv->key = e->key;
+	kv->value = &e->value;
+	return 0;
+}
 
-
-
-
-
-
+gpair_s* dict_pair(dict_t* d){
+	size_t counts = rbtree_count(d->itree) + rbtree_count(d->stree) + 1;
+	gpair_s* kv = VECTOR(gpair_s, counts);
+	map_rbtree_inorder(rbtree_node_root(d->itree), vmap, &kv);
+	map_rbtree_inorder(rbtree_node_root(d->stree), vmap, &kv);
+	return kv;
+}
 
 
 

@@ -31,5 +31,6 @@ void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg);
 void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg);
 void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg);
 
+size_t rbtree_count(rbtree_t* t);
 
 #endif

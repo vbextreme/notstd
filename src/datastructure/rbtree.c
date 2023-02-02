@@ -379,3 +379,7 @@ void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 	map_rbtree_inorder(n->right, fn, arg);
 	fn(n->data, arg);
 }
+
+size_t rbtree_count(rbtree_t* t){
+	return t->count;
+}

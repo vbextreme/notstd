@@ -4,13 +4,14 @@
 #include <notstd/core.h>
 #include <notstd/generics.h>
 
-//foreach
-//map
-//pair
+typedef struct gpair{
+	generic_s key;
+	generic_s* value;
+}gpair_s;
 
 typedef struct dict dict_t;
 
-typedef int(*dictMap_f)(generic_s key, generic_s* value, void* arg);
+typedef int(*dictMap_f)(gpair_s pair, void* arg);
 
 dict_t* dict_new(void);
 generic_s* dicti(dict_t* d, long key);
@@ -37,6 +38,8 @@ int dictirm(dict_t* d, long key);
 )(D, K)
 
 void map_dict(dict_t* d, dictMap_f fn, void* arg);
+gpair_s* dict_pair(dict_t* d);
 
+#define foreach_dict(D, KV, IT) for( gpair_s* KV = dict_pair(d); KV; DELETE(KV) ) for(size_t IT = 0; i < vector_count(&KV); ++IT)
 
 #endif

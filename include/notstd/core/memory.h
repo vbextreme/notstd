@@ -48,7 +48,7 @@
 //create an header memory inside other memory
 #define VIRTUAL(T,C,ADDR)     (T*)mem_alloc(sizeof(T)*(C), MEM_FLAG_VIRTUAL, NULL, 0, ADDR)
 //same mem_free but set ptr to null
-#define DELETE(M)           do{ mem_free(M); (M)=NULL; }while(0)
+#define DELETE(M)           ({ mem_free(M); (M)=NULL; NULL; })
 //realloc type safe
 #define RESIZE(T,M,C)       (T*)mem_realloc((M), sizeof(T)*(C))
 
