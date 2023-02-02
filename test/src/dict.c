@@ -1,12 +1,10 @@
 #include <notstd/dict.h>
 
 __private int pair(generic_s key, generic_s* value, __unused void* arg){
-	if( key.type == G_LONG ){
-		printf("%ld: %s\n", key.l, value->lstr);
-	}
-	else{
-		printf("%s: %s\n", key.lstr, value->lstr);
-	}
+	g_print(key);
+	fputs(": ", stdout);
+	g_print(*value);
+	putchar('\n');	
 	return 0;
 }
 
