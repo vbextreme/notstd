@@ -130,6 +130,8 @@ __private void rbt_insertfix(rbtNode_t** root, rbtNode_t *page){
 }
 
 rbtNode_t* rbtree_insert(rbtree_t* rbt, rbtNode_t* page){
+	if( page->color != RBT_RAINBOW ) return page;
+
 	page->color = RBT_RED;
     rbtNode_t* p = rbt->root;
     rbtNode_t* q = NULL;
@@ -232,11 +234,13 @@ __private rbtNode_t* rbt_successor(rbtNode_t* p){
 }
 
 rbtNode_t* rbtree_remove(rbtree_t* rbt, rbtNode_t* p){
+	if( p->color == RBT_RAINBOW ) return p;
 	if( !rbt->root || !p ) return NULL;
 	--rbt->count;
 	if( (rbt->root) == p && (rbt->root)->left == NULL && (rbt->root)->right == NULL ){
 		p->parent = p->left = p->right = NULL;
 		rbt->root = NULL;
+		p->color = RBT_RAINBOW;
 		return p;
 	}
 
@@ -284,7 +288,7 @@ rbtNode_t* rbtree_remove(rbtree_t* rbt, rbtNode_t* p){
 		else if( p->parent->right == p ) p->parent->right = NULL;
 	}
 	p->parent = p->left = p->right = NULL;
-	p->color = -1;
+	p->color = RBT_RAINBOW;
 	return p;
 }
 
@@ -336,8 +340,42 @@ rbtNode_t* rbtree_node_data_set(rbtNode_t* n, void* data){
 	return n;
 }
 
+rbtNode_t* rbtree_node_root(rbtree_t* t){
+	return t->root;
+}
 
+rbtNode_t* rbtree_node_left(rbtNode_t* node){
+	if( node->color == RBT_RAINBOW ) return NULL;
+	return node->left;
+}
 
+rbtNode_t* rbtree_node_right(rbtNode_t* node){
+	if( node->color == RBT_RAINBOW ) return NULL;
+	return node->right;
+}
 
+rbtNode_t* rbtree_node_parent(rbtNode_t* node){
+	if( node->color == RBT_RAINBOW ) return NULL;
+	return node->parent;
+}
 
+void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg){
+	if( n == NULL || n->color == RBT_RAINBOW ) return;
+	map_rbtree_inorder(n->left, fn, arg);
+	if( fn(n->data, arg) ) return;
+	map_rbtree_inorder(n->right, fn, arg);
+}
 
+void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg){
+	if( n == NULL || n->color == RBT_RAINBOW ) return;
+	if( fn(n->data, arg) ) return;
+	map_rbtree_inorder(n->left, fn, arg);
+	map_rbtree_inorder(n->right, fn, arg);
+}
+
+void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg){
+	if( n == NULL || n->color == RBT_RAINBOW ) return;
+	map_rbtree_inorder(n->left, fn, arg);
+	map_rbtree_inorder(n->right, fn, arg);
+	fn(n->data, arg);
+}

@@ -3,8 +3,6 @@
 
 #include <notstd/core.h>
 
-//TODO map
-
 /**************************/
 /*** simple linked list ***/
 /**************************/
@@ -26,6 +24,13 @@ typedef struct listSingly{
 //	printf("%p\n", it);
 //}
 #define foreach_ls(L, IT) for(typeof(L) IT = (L); IT; (IT)=ls_next(IT))
+
+#define map_ls(L, F, A, O, N) do{\
+	typeof(L) IT = L;\
+	for( unsigned __i__ = O; __i__ < (N) && IT; ++__i__, (IT)=ls_next(IT) ){\
+		IT = F(IT, A);\
+	}\
+}while(0);
 
 //initialize element of list, return v
 void* ls_ctor(void* v);
@@ -90,5 +95,13 @@ void* ld_extract_preserve_prev(void* pv);
 
 //foreach_ld works only if you have sentinel elemnt on the list, L is a sentinel element
 #define foreach_ld(L, IT) for( typeof(L) IT = ld_next(L); IT != L; IT = ld_next(IT) )
+
+#define map_ld(L, F, A, O, N) do{\
+	typeof(L) IT = L;\
+	ld_next(L);\
+	for( unsigned __i__ = O; __i__ < (N) && IT != L; ++__i__, (IT)=ld_next(IT) ){\
+		IT = F(IT, A);\
+	}\
+}while(0);
 
 #endif

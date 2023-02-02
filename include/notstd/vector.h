@@ -55,8 +55,8 @@ typedef struct vextend{
 #define each_vector(V, N) for( void* end = (void*)(ADDR(V) );  IT = 0; IT < vector_count(&V); ++IT )
 
 #define map_vector(V, F, A, O, N) do{\
-	foreach_vector(V, __IT__, O, N){\
-		V[__IT__] = F(V[__IT__]);\
+	for( unsigned __i__ = O; __i__ < (N); ++__i__ ){\
+		V[__i__] = F(V[__i__], A);\
 	}\
 }while(0);
 

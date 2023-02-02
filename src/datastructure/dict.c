@@ -84,6 +84,31 @@ int dictsrm(dict_t* d, const char* key){
 	return 0;
 }
 
+typedef struct maparg{
+	dictMap_f fn;
+	void* ctx;
+}maparg_s;
+
+__private int tmap(void* data, void* arg){
+	dictE_s* e = data;
+	maparg_s* a = arg;
+	return a->fn(e->key, &e->value, a->ctx);
+}
+
+void map_dict(dict_t* d, dictMap_f fn, void* arg){
+	maparg_s a = { .fn = fn, .ctx = arg }; 
+	map_rbtree_inorder(rbtree_node_root(d->itree), tmap, &a);
+	map_rbtree_inorder(rbtree_node_root(d->stree), tmap, &a);
+}
+
+
+
+
+
+
+
+
+
 
 
 

@@ -6,6 +6,11 @@ __private int cmp(const void* a, const void* b){
 	return (int)(uintptr_t)a - (int)(uintptr_t)b;
 }
 
+__private int mapp(void* data, __unused void* arg){
+	printf("%d\n", (int)(uintptr_t)(data));
+	return 0;
+}
+
 #define N 8
 
 void uc_rbtree(){
@@ -18,8 +23,14 @@ void uc_rbtree(){
 		rbtree_insert(t, mem_gift(rbtree_node_new((void*)(uintptr_t)num), t));
 		printf("insert: %d\n", num);
 	}
-	//dbg_info("dump");
-	//rbtree_dump(t);
+
+	puts("inorder:");
+	map_rbtree_inorder(rbtree_node_root(t), mapp, NULL);
+	puts("postorder:");
+	map_rbtree_postorder(rbtree_node_root(t), mapp, NULL);
+	puts("preorder:");
+	map_rbtree_preorder(rbtree_node_root(t), mapp, NULL);
+
 
 	dbg_info("search");
 	for( unsigned i = 0; i < N; ++i ){
