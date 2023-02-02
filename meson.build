@@ -36,6 +36,7 @@ src += [ 'src/datastructure/hashalg.c' , 'src/datastructure/rbhash.c' ]
 src += [ 'src/datastructure/fzs.c' ]
 src += [ 'src/datastructure/phq.c' ]
 src += [ 'src/datastructure/rbtree.c' ]
+src += [ 'src/datastructure/dict.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -70,6 +71,7 @@ elif ut == 'datastructure'
   src += [ 'test/src/fzs.c' ]
   src += [ 'test/src/phq.c' ]
   src += [ 'test/src/rbtree.c' ]
+  src += [ 'test/src/dict.c' ]
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
   add_global_arguments('-DTEST_DATASTRUCTURE=@0@'.format(get_option('utvalue')), language: 'c')

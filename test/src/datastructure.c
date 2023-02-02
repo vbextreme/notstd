@@ -16,6 +16,7 @@ void uc_fzs_inp(void);
 void uc_fzs_benchmark(void);
 void uc_phq(void);
 void uc_rbtree();
+void uc_dict(void);
 
 int main(){
 	if( MODE & 0x0001 ) uc_vector();
@@ -28,4 +29,6 @@ int main(){
 	if( MODE & 0x0080 ) uc_fzs_benchmark();
 	if( MODE & 0x0100 ) uc_phq();
 	if( MODE & 0x0200 ) uc_rbtree();
+	if( MODE & 0x0400 ) uc_dict();
 }
+

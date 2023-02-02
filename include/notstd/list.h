@@ -3,6 +3,8 @@
 
 #include <notstd/core.h>
 
+//TODO map
+
 /**************************/
 /*** simple linked list ***/
 /**************************/

@@ -3,6 +3,9 @@
 
 #include <notstd/core.h>
 
+//TODO inorder
+//map
+
 typedef struct rbtNode rbtNode_t;
 typedef struct rbtree rbtree_t;
 
