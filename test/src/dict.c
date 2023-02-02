@@ -16,6 +16,9 @@ void uc_dict(void){
 	*dict(d, 1) = GI("one");
 	*dict(d, 2) = GI("two");
 	*dict(d, 3) = GI("three");
+	*dict(d, "float") = GI(4.2);
+	*dict(d, "signed") = GI(4);
+	dict(d, "unset value");
 
 	map_dict(d, pair, NULL);
 }
