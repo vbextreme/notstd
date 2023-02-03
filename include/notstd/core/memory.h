@@ -55,6 +55,22 @@
 //classic way for swap any value
 #define swap(A,B) ({ typeof(A) tmp = A; (A) = (B); (B) = tmp; })
 
+//realign to next valid address of pointers, prevent strict aliasing
+//int v[32];
+//int* pv = v[1];
+//char* ch = (char*)pv;
+//++ch;
+//pv = (int*)ch; //strict aliasing
+//aliasing_next(pv); //now pv points to correct address, v[2]
+#define aliasing_next(PTR) do{ PTR = (void*)(ROUND_UP(ADDR(PTR), sizeof(PTR[0]))) } while(0)
+
+//realign to previus valid address of pointers, prevent strict aliasing
+//aliasing_prev(pv); //now pv points to correct address, v[1]
+#define aliasing_prev(PTR) do{ PTR = (void*)(ROUND_DOWN(ADDR(PTR), sizeof(PTR[0]))) } while(0)
+
+//return 0 if not violate strict aliasing, otherwise you can't cast without creash your software
+#define aliasing_check(PTR) (ADDR(PTR)%sizeof(PTR[0]))
+
 //callback type for cleanup object
 typedef void (*mcleanup_f)(void*);
 

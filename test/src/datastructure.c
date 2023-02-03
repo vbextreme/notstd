@@ -30,5 +30,7 @@ int main(){
 	if( MODE & 0x0100 ) uc_phq();
 	if( MODE & 0x0200 ) uc_rbtree();
 	if( MODE & 0x0400 ) uc_dict();
+
+	return 0;
 }
 

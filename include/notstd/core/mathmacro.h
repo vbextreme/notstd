@@ -20,7 +20,18 @@
 #define P³(N) ({ typeof(N) A = (N); A*A*A; })
 #define Pⁿ pow
 
-#define ROUND_UP(N,S) ((((N)+(S)-1)/(S))*(S))
+//((((N)+(S)-1)/(S))*(S))
+#define ROUND_UP(N,S) ({\
+	typeof(N) n = N;\
+	typeof(S) s = S;\
+	((n+s-1)/s)*s;\
+})
+
+#define ROUND_DOWN(N,S) ({\
+	typeof(N) n = N;\
+	typeof(S) s = S;\
+	(n/s)*s;\
+})
 
 #define ROUND_UP_POW_TWO32(N) ({\
 	   	unsigned int r = (N);\
