@@ -70,18 +70,25 @@ void* vector_remove(void* v, const size_t index, const size_t count){
 	iassert(pv && *pv);
 	vextend_s* ve = mem_extend(*pv);
 
-	if( index + count >= ve->count){
+	if( ! count ) return *pv;
+
+	if( index + count > ve->count){
 		dbg_warning("index out of bound");	
 		return NULL;
 	}
 
-	if( index + count < ve->count - 1 ){
-		void* dst = (void*)(ADDR(*pv) + index * ve->sof);
-		const void* src = (void*)(ADDR(*pv) + (index+count) * ve->sof);
-		const size_t mem = (ve->count - (index+count-1)) * ve->sof;
-		memmove(dst, src, mem);
+	if( index == ve->count - 1 ){
+		--ve->count;
+		return vector_shrink(v);
 	}
+
+	void* dst = (void*)(ADDR(*pv) + index * ve->sof);
+	const void* src = (void*)(ADDR(*pv) + (index+count) * ve->sof);
+	const size_t mem = (ve->count - (index+count)) * ve->sof;
+	iassert( ADDR(src) + mem <= ADDR(*pv) + ve->count * ve->sof );
+	memmove(dst, src, mem);
 	ve->count -= count;
+
 	return vector_shrink(v);
 }
 

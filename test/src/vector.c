@@ -32,4 +32,22 @@ void uc_vector(){
 		dbg_info("%d", arr[i]);
 	}
 	dbg_info("");
+
+	dbg_info("new vector");
+	__free int* v = VECTOR(int, 10);
+	for( unsigned i = 0; i < 16; ++i ){
+		vector_push(&v, &i);
+	}
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+
+	dbg_info("remove first element");
+	vector_remove(&v, 0, 1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+
+
+
+
+
 }
