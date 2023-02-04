@@ -45,8 +45,34 @@ void uc_vector(){
 	vector_remove(&v, 0, 1);
 	foreach_vector(v, it) printf("%d, ", v[it]);
 	puts("");
+	dbg_info("remove last element");
+	vector_remove(&v, vector_count(&v)-1, 1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+	dbg_info("remove center element");
+	vector_remove(&v, vector_count(&v)/2, 1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+
+	int add;
+	dbg_info("add first element");
+	add = 0;
+	vector_insert(&v, 0, &add, 1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+	dbg_info("add last element");
+	add = 15;
+	vector_insert(&v, vector_count(&v), &add,  1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
+	dbg_info("add center element");
+	add = 8;
+	vector_insert(&v, 8, &add, 1);
+	foreach_vector(v, it) printf("%d, ", v[it]);
+	puts("");
 
 
+	
 
 
 

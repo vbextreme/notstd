@@ -95,24 +95,29 @@ void* vector_remove(void* v, const size_t index, const size_t count){
 void* vector_insert(void* v, const size_t index, void* value, const size_t count){
 	void** pv = v;
 	iassert(pv && *pv);
-	vextend_s* ve = mem_extend(v);
+	vextend_s* ve = mem_extend(*pv);
 
+	if( count == 1 && index == ve->count ) return vector_push(v, value);
+
+	//if index == ve->count, is simple push but with more than one element	
 	if( index > ve->count){
 		dbg_warning("index out of bound");	
 		return NULL;
 	}
 
-	ve = mem_extend(v);
+	ve = mem_extend(*pv);
 	UPSIZE(ve, *pv, count);
 
-	void* dst = (void*)(ADDR(*pv) + (index + count) * ve->sof);
+	void* dst = (void*)(ADDR(*pv) + index * ve->sof);
 
+	//need create space
 	if( index < ve->count ){
-		const void* src = (void*)(ADDR(*pv) + index * ve->sof);
-		const size_t mem = count * ve->sof;
-		memmove(dst, src, mem);
+		void* src = (void*)(ADDR(*pv) + (index+count) * ve->sof);
+		const size_t mem = (ve->count - (index+count)) * ve->sof;
+		iassert( ADDR(dst) + mem <= ADDR(*pv) + ve->count * ve->sof );
+		memmove(src, dst, mem);
 	}
-	
+
 	if( value ){
 		memcpy(dst, value, count * ve->sof);
 	}
