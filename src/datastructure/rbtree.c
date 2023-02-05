@@ -369,14 +369,14 @@ void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 	if( n == NULL || n->color == RBT_RAINBOW ) return;
 	if( fn(n->data, arg) ) return;
-	map_rbtree_inorder(n->left, fn, arg);
-	map_rbtree_inorder(n->right, fn, arg);
+	map_rbtree_preorder(n->left, fn, arg);
+	map_rbtree_preorder(n->right, fn, arg);
 }
 
 void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 	if( n == NULL || n->color == RBT_RAINBOW ) return;
-	map_rbtree_inorder(n->left, fn, arg);
-	map_rbtree_inorder(n->right, fn, arg);
+	map_rbtree_postorder(n->left, fn, arg);
+	map_rbtree_postorder(n->right, fn, arg);
 	fn(n->data, arg);
 }
 
