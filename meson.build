@@ -30,6 +30,7 @@ src += [ 'src/memory/extras.c' ]
 
 src += [ 'src/concurrency/futex.c' ]
 
+src += [ 'src/datastructure/map.c' ]
 src += [ 'src/datastructure/vector.c' ]
 src += [ 'src/datastructure/list.c' ]
 src += [ 'src/datastructure/hashalg.c' , 'src/datastructure/rbhash.c' ]

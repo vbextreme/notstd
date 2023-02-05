@@ -1,4 +1,5 @@
 #include <notstd/rbtree.h>
+#include <notstd/vector.h>
 
 #define RBT_BLACK   0
 #define RBT_RED     1
@@ -359,6 +360,43 @@ rbtNode_t* rbtree_node_parent(rbtNode_t* node){
 	return node->parent;
 }
 
+struct rbtreeit{
+	unsigned long count;
+	rbtNode_t*  cur;
+	rbtNode_t** stk;
+};
+
+rbtree_i* rbtree_iterator(rbtree_t* t, unsigned offset, unsigned long count){
+	rbtree_i* it = NEW(rbtree_i);
+	if( !count ) count = t->count;
+	if( (unsigned)count > t->count ) count = t->count;
+	size_t h = 2 * log2(count+1);
+	if( h < 2 ) h = 2;
+	it->count = t->count;
+	it->stk = mem_gift(VECTOR(rbtNode_t*, h), it);
+	it->cur = t->root;
+	while( offset --> 0 ) rbtree_iterate_inorder(it);
+	it->count = count;
+	return it;
+}
+
+void* rbtree_iterate_inorder(void* IT){
+	rbtree_i* it = IT;
+	if( !it->count ) return NULL;
+	while( it->cur ){
+		vector_push(&it->stk, &it->cur);
+		it->cur = it->cur->left;
+	}
+	if( !vector_count(&it->stk) ) return NULL;
+	
+	rbtNode_t* n;
+	vector_pop(&it->stk, &n);
+	it->cur = n->right;
+	--it->count;
+	return n;
+}
+
+/*
 void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 	if( n == NULL || n->color == RBT_RAINBOW ) return;
 	map_rbtree_inorder(n->left, fn, arg);
@@ -379,6 +417,7 @@ void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg){
 	map_rbtree_postorder(n->right, fn, arg);
 	fn(n->data, arg);
 }
+*/
 
 size_t rbtree_count(rbtree_t* t){
 	return t->count;

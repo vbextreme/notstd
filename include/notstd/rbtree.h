@@ -6,8 +6,9 @@
 typedef struct rbtNode rbtNode_t;
 typedef struct rbtree rbtree_t;
 
-typedef int (*rbtCompare_f)(const void* a, const void* b);
+typedef struct rbtreeit rbtree_i;
 
+typedef int (*rbtCompare_f)(const void* a, const void* b);
 typedef int(*rbtMap_f)(void* data, void* arg);
 
 rbtNode_t* rbtree_insert(rbtree_t* rbt, rbtNode_t* n);
@@ -27,9 +28,12 @@ rbtNode_t* rbtree_node_left(rbtNode_t* node);
 rbtNode_t* rbtree_node_right(rbtNode_t* node);
 rbtNode_t* rbtree_node_parent(rbtNode_t* node);
 
-void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg);
-void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg);
-void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg);
+rbtree_i* rbtree_iterator(rbtree_t* t, unsigned offset, unsigned long count);
+void* rbtree_iterate_inorder(void* IT);
+
+//void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg);
+//void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg);
+//void map_rbtree_postorder(rbtNode_t* n, rbtMap_f fn, void* arg);
 
 size_t rbtree_count(rbtree_t* t);
 

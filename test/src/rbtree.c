@@ -1,3 +1,4 @@
+#include <notstd/map.h>
 #include <notstd/rbtree.h>
 #include <notstd/mth.h>
 #include <notstd/vector.h>
@@ -7,10 +8,9 @@ __private int cmp(const void* a, const void* b){
 }
 
 __private int mapp(void* data, __unused void* arg){
-	printf("%d\n", (int)(uintptr_t)(data));
+	printf("%d\n", (int)(uintptr_t)(rbtree_node_data(data)));
 	return 0;
 }
-
 #define N 8
 
 void uc_rbtree(){
@@ -24,13 +24,8 @@ void uc_rbtree(){
 		printf("insert: %d\n", num);
 	}
 
-	puts("inorder:");
-	map_rbtree_inorder(rbtree_node_root(t), mapp, NULL);
-	puts("postorder:");
-	map_rbtree_postorder(rbtree_node_root(t), mapp, NULL);
-	puts("preorder:");
-	map_rbtree_preorder(rbtree_node_root(t), mapp, NULL);
-
+	puts("iterate");
+	mem_free(map(mapp, NULL, rbtree_iterate_inorder, rbtree_iterator(t, 0, 0)));
 
 	dbg_info("search");
 	for( unsigned i = 0; i < N; ++i ){

@@ -1,9 +1,11 @@
 #include <notstd/dict.h>
+#include <notstd/map.h>
 
-__private int pair(gpair_s kv, __unused void* arg){
-	g_print(kv.key);
+__private int pair(void* KV, __unused void* arg){
+	dictPair_s* kv = KV;
+	g_print(kv->key);
 	fputs(": ", stdout);
-	g_print(*kv.value);
+	g_print(kv->value);
 	putchar('\n');	
 	return 0;
 }
@@ -21,13 +23,14 @@ void uc_dict(void){
 	dict(d, "unset value");
 
 	puts("map");
-	map_dict(d, pair, NULL);
+	mem_free(map(pair, NULL, dict_iterate, dict_iterator(d, 0, 0)));
+	//map_dict(d, pair, NULL);
 
 	puts("foreach");
-	foreach_dict(d, kv, i){
-		g_print(kv[i].key);
-		fputs(": ", stdout);
-		g_print(*kv[i].value);
-		putchar('\n');	
-	}
+	//foreach_dict(d, kv, i){
+	//	g_print(kv[i].key);
+	//	fputs(": ", stdout);
+	//	g_print(*kv[i].value);
+	//	putchar('\n');	
+	//}
 }
