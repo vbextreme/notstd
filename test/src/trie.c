@@ -1,5 +1,7 @@
 #include <notstd/trie.h>
 
+//TODO test iterator
+
 void uc_trie(void){
 	char* words[] = {
 		"hello",

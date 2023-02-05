@@ -18,6 +18,7 @@ typedef struct trieN{
 
 struct trie{
 	trieN_s* root;
+	unsigned count;
 };
 
 __private trieN_s* tn_new(trie_t* tr){
@@ -82,13 +83,13 @@ int trie_insert(trie_t* tr, const char* str, unsigned len, void* data){
 	if( !len ) len = strlen(str);
 
 	trieN_s* n = tr->root;
-	while( len ){
-		
+	while( len ){	
 		unsigned im;
 		trieE_s* e = e_find(n, str, &im, NULL);
 		if( !e ){
 			dbg_info("not find E, element not exists in this N, add and return");
 			tn_endpoint_add(n, str, len, data, NULL);
+			++tr->count;
 			return 0;
 		}
 
@@ -109,6 +110,7 @@ int trie_insert(trie_t* tr, const char* str, unsigned len, void* data){
 
 		if( im < e->len ){
 			e_split(tr, n, e, im, str, len, data);
+			++tr->count;
 			return 0;
 		}
 
@@ -116,6 +118,7 @@ int trie_insert(trie_t* tr, const char* str, unsigned len, void* data){
 			dbg_info("string have more chars but no more node, create new node for remaning string and return");
 			e->next = tn_new(tr);
 			tn_endpoint_add(e->next, str, len, data, NULL);
+			++tr->count;
 			return 0;
 		}
 
@@ -123,7 +126,7 @@ int trie_insert(trie_t* tr, const char* str, unsigned len, void* data){
 		n = e->next;
 	}
 
-	return 0;
+	return -1;
 }
 
 void* trie_find(trie_t* tr, const char* str, unsigned len){
@@ -205,7 +208,9 @@ __private int rm_rec(trie_t* tr, trieN_s* n, const char* str, unsigned len){
 //ensure data exists before remove
 int trie_remove(trie_t* tr,  const char* str, unsigned len){
 	dbg_info("remove %s", str);
-	return rm_rec(tr, tr->root, str, len ? len : strlen(str));
+	if( rm_rec(tr, tr->root, str, len ? len : strlen(str)) ) return -1;
+	--tr->count;
+	return 0;
 }
 
 __private void pt(unsigned tab){
@@ -226,12 +231,42 @@ void trie_dump(trie_t* tr){
 	tn_dump(tr->root, 0);
 }
 
+struct trieit{
+	unsigned count;
+	trieN_s** stk;
+	trieN_s*  cur;
+	unsigned  icur;
+};
 
+trie_i* trie_iterator(trie_t* tr, unsigned off, unsigned count){
+	trie_i* it = NEW(trie_i);
+	if( !count ) count = tr->count;
+	it->stk = mem_gift(VECTOR(trieN_s*, tr->count+1), it);
+	it->cur = tr->root;
+	it->icur = 0;
+	it->count = tr->count+1;
+	while( off-->0 ) trie_iterate(it);
+	it->count = count;
+	return it;
+}
 
+void* trie_iterate(void* IT){
+	trie_i* it = IT;
+	void* ret = NULL;
+	if( !it->count ) return NULL;
 
+	while( !ret ){
+		if( it->icur >= vector_count(&it->icur) ){
+			if( !vector_pop(&it->stk, &it->cur) ) return NULL;
+			it->icur = 0;
+		}
+	
+		if( it->cur->ve[it->icur].next ) vector_push(&it->stk, &it->cur->ve[it->icur].next);
+		if( it->cur->ve[it->icur].data ) ret = it->cur->ve[it->icur].data;
+		++it->icur;
+	}
 
-
-
-
-
+	--it->count;
+	return ret;
+}
 
