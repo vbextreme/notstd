@@ -23,14 +23,11 @@ void uc_dict(void){
 	dict(d, "unset value");
 
 	puts("map");
-	mem_free(map(pair, NULL, dict_iterate, dict_iterator(d, 0, 0)));
-	//map_dict(d, pair, NULL);
+	map(dict, d, pair, NULL, 0, 0);
 
 	puts("foreach");
-	//foreach_dict(d, kv, i){
-	//	g_print(kv[i].key);
-	//	fputs(": ", stdout);
-	//	g_print(*kv[i].value);
-	//	putchar('\n');	
-	//}
+	dictPair_s* kv;
+	foreach(dict, d, kv, 0, 0){
+		pair(kv, NULL);
+	}
 }

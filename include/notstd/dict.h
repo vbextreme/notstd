@@ -26,7 +26,7 @@ int dictsrm(dict_t* d, const char* key);
 int dictirm(dict_t* d, long key);
 unsigned long dict_count(dict_t* dic);
 
-dict_i* dict_iterator(dict_t* dic, unsigned long offset, unsigned long count);
+dict_i* dict_iterator(dict_t* dic, unsigned offset, unsigned count);
 void* dict_iterate(void* IT);
 
 #define dict(D,K) _Generic((K),\
@@ -48,9 +48,5 @@ void* dict_iterate(void* IT);
 )(D, K)
 
 
-//void map_dict(dict_t* d, dictMap_f fn, void* arg);
-//gpair_s* dict_pair(dict_t* d);
-
-//#define foreach_dict(D, KV, IT) for( gpair_s* KV = dict_pair(d); KV; DELETE(KV) ) for(size_t IT = 0; i < vector_count(&KV); ++IT)
 
 #endif

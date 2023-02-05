@@ -25,8 +25,8 @@ void uc_rbtree(){
 	}
 
 	puts("iterate");
-	mem_free(map(mapp, NULL, rbtree_iterate_inorder, rbtree_iterator(t, 0, 0)));
-
+	map(rbtree_inorder, t, mapp, NULL, 0, 0);
+	
 	dbg_info("search");
 	for( unsigned i = 0; i < N; ++i ){
 		if( !rbtree_find(t, (void*)(uintptr_t)val[i]) ) die("try find element %d but not exists", val[i]);

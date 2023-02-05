@@ -28,8 +28,8 @@ rbtNode_t* rbtree_node_left(rbtNode_t* node);
 rbtNode_t* rbtree_node_right(rbtNode_t* node);
 rbtNode_t* rbtree_node_parent(rbtNode_t* node);
 
-rbtree_i* rbtree_iterator(rbtree_t* t, unsigned offset, unsigned long count);
-void* rbtree_iterate_inorder(void* IT);
+rbtree_i* rbtree_inorder_iterator(rbtree_t* t, unsigned offset, unsigned count);
+void* rbtree_inorder_iterate(void* IT);
 
 //void map_rbtree_inorder(rbtNode_t* n, rbtMap_f fn, void* arg);
 //void map_rbtree_preorder(rbtNode_t* n, rbtMap_f fn, void* arg);

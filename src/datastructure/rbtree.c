@@ -361,26 +361,26 @@ rbtNode_t* rbtree_node_parent(rbtNode_t* node){
 }
 
 struct rbtreeit{
-	unsigned long count;
+	unsigned count;
 	rbtNode_t*  cur;
 	rbtNode_t** stk;
 };
 
-rbtree_i* rbtree_iterator(rbtree_t* t, unsigned offset, unsigned long count){
+rbtree_i* rbtree_inorder_iterator(rbtree_t* t, unsigned offset, unsigned count){
 	rbtree_i* it = NEW(rbtree_i);
 	if( !count ) count = t->count;
-	if( (unsigned)count > t->count ) count = t->count;
+	if( count > t->count ) count = t->count;
 	size_t h = 2 * log2(count+1);
 	if( h < 2 ) h = 2;
 	it->count = t->count;
 	it->stk = mem_gift(VECTOR(rbtNode_t*, h), it);
 	it->cur = t->root;
-	while( offset --> 0 ) rbtree_iterate_inorder(it);
+	while( offset --> 0 ) rbtree_inorder_iterate(it);
 	it->count = count;
 	return it;
 }
 
-void* rbtree_iterate_inorder(void* IT){
+void* rbtree_inorder_iterate(void* IT){
 	rbtree_i* it = IT;
 	if( !it->count ) return NULL;
 	while( it->cur ){
