@@ -241,6 +241,7 @@ struct trieit{
 trie_i* trie_iterator(trie_t* tr, unsigned off, unsigned count){
 	trie_i* it = NEW(trie_i);
 	if( !count ) count = tr->count;
+	if( count > tr->count ) count = tr->count;
 	it->stk = mem_gift(VECTOR(trieN_s*, tr->count+1), it);
 	it->cur = tr->root;
 	it->icur = 0;

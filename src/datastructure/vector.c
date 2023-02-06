@@ -190,3 +190,31 @@ void* vector_bsearch(void* v, void* search, cmp_f fn){
 	vextend_s* ve = mem_extend(*pv);
 	return bsearch(search, *pv, ve->count, ve->sof, fn);
 }
+
+struct vector{
+	unsigned i;
+	unsigned count;
+	void* v;
+};
+
+vector_i* vector_iterator(void* v, unsigned off, unsigned count){
+	iassert(v);
+	vextend_s* ve = mem_extend(v);
+	if( !count ) count  = ve->count;
+	if( count > ve->count ) count = ve->count;
+	vector_i* it = NEW(vector_i);
+	it->i = off;
+	it->count = count;
+	it->v = v;
+	return it;
+}
+
+void* vector_iterate(void* IT){
+	vector_i* it = IT;
+	if( it->i >= it->count ) return NULL;
+	void* ret = (void*)(ADDR(it->v) + it->i * vector_sizeof(it->v) );
+	++it->i;
+	return ret;
+}
+
+

@@ -46,13 +46,9 @@ typedef struct vextend{
 //}
 #define foreach_vector(V, IT) for( size_t IT = 0; IT < vector_count(&V); ++IT )
 
-//iterate over vector with element and not with index
-//this is only function than not need to call with &
-//int* a = .....;
-//vector_foreach(a, i){
-//  printf("%d\n", a[i]);
-//}
-#define each_vector(V, N) for( void* end = (void*)(ADDR(V) );  IT = 0; IT < vector_count(&V); ++IT )
+
+typedef struct vector vector_i;
+
 
 #define map_vector(V, F, A, O, N) do{\
 	for( unsigned __i__ = O; __i__ < (N); ++__i__ ){\
@@ -114,5 +110,11 @@ void vector_shuffle(void* v, size_t begin, size_t end);
 
 //sorting vector
 void vector_qsort(void* v, cmp_f fn);
+
+
+vector_i* vector_iterator(void* v, unsigned off, unsigned count);
+
+void* vector_iterate(void* IT);
+
 
 #endif 
