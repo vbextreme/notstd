@@ -130,13 +130,14 @@ void* lbuffer_fill(lbuffer_t* lb, __out unsigned* size){
 	return &lb->fill->mem[lb->fill->len];
 }
 
-void lbuffer_fill_commit(lbuffer_t* lb, unsigned size){
+unsigned lbuffer_fill_commit(lbuffer_t* lb, unsigned size){
 	if( size > lb->size - lb->fill->len ){
 		dbg_warning("try to commit more memory you have");
 		size = lb->size - lb->fill->len;
 	}
 	lb->fill->len += size;
 	if( lb->fill->len >= lb->size ) lb_fill_finished(lb);
+	return size;
 }
 
 void lbuffer_fill_finished(lbuffer_t* lb){
@@ -152,10 +153,10 @@ void* lbuffer_read(lbuffer_t* lb, __out unsigned* size){
 	return &lb->ready->mem[lb->ready->ir];
 }
 
-void lbuffer_read_commit(lbuffer_t* lb, unsigned size){
+unsigned lbuffer_read_commit(lbuffer_t* lb, unsigned size){
 	if( !lb->ready ){
 		dbg_warning("try to commit on empty buffer");
-		return;
+		return 0;
 	}
 	if( size > lb->ready->len - lb->fill->ir ){
 		dbg_warning("try to commit more memory you have");
@@ -164,6 +165,7 @@ void lbuffer_read_commit(lbuffer_t* lb, unsigned size){
 	lb->ready->ir += size;
 	lb->total -= size;
 	if( lb->ready->ir >= lb->ready->len ) lb_ready_finished(lb);
+	return size;
 }
 
 void lbuffer_ready_finished(lbuffer_t* lb){
