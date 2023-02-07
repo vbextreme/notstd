@@ -1,11 +1,12 @@
-notstd v0.0.11
+notstd v0.0.12
 ====================
 not stdandard library for C, designated to run on Linux and GCC.<Br>
 If you not have Linux you can download and install, same for GCC, i think not change my code only because you want use naif OS or Compiler.
 
 State:
 ======
-* v0,0.11 add round down, aliasing help function, trie
+* v0.0.12 add lbuffer, iterator, map, foreach,
+* v0.0.11 add round down, aliasing help function, trie
 * v0.0.10 add unset in generic, vector bsearch, rbtree, map vector, dictionary 
 * v0.0.9  add generic union type
 * v0.0.8  add priority heap queue

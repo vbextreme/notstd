@@ -1,7 +1,7 @@
 ###########
 # project #
 ###########
-project('notstd', 'c', version: '0.0.11')
+project('notstd', 'c', version: '0.0.12')
 
 cc = meson.get_compiler('c')
 
@@ -39,6 +39,7 @@ src += [ 'src/datastructure/phq.c' ]
 src += [ 'src/datastructure/rbtree.c' ]
 src += [ 'src/datastructure/dict.c' ]
 src += [ 'src/datastructure/trie.c' ]
+src += [ 'src/datastructure/lbuffer.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -75,6 +76,8 @@ elif ut == 'datastructure'
   src += [ 'test/src/rbtree.c' ]
   src += [ 'test/src/dict.c' ]
   src += [ 'test/src/trie.c' ]
+  src += [ 'test/src/lbuffer.c' ]
+
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
   add_global_arguments('-DTEST_DATASTRUCTURE=@0@'.format(get_option('utvalue')), language: 'c')

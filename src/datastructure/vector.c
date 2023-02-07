@@ -58,8 +58,8 @@ void* vector_shrink(void* v){
 	void** pv = v;
 	iassert(pv && *pv);
 	vextend_s* ve = mem_extend(*pv);
-	if( ve->max - ve->count > ve->max / 4 ){
-		ve->max -= ve->max / 4;
+	if( ve->count < ve->max / 4 ){
+		ve->max /= 2;
 		*pv = mem_realloc(*pv, ve->max * ve->sof);
 	}
 	return *pv;

@@ -19,19 +19,22 @@ typedef struct vextend{
 
 //return sizeof element
 #define vector_sizeof(PTR) ({\
-	vextend_s* ve = mem_extend(*(void**)(PTR));	\
+	void** pv = (void**)(PTR);\
+	vextend_s* ve = mem_extend(*pv);\
 	ve->sof;\
 })
 
 //return numbers of element in array
 #define vector_count(PTR) ({\
-	vextend_s* ve = mem_extend(*(void**)(PTR));	\
+	void** pv = (void**)(PTR);\
+	vextend_s* ve = mem_extend(*pv);\
 	ve->count;\
 })
 
 //return max numbers of element you can reserved
 #define vector_lenght(PTR) ({\
-	vextend_s* ve = mem_extend(*(void**)(PTR));	\
+	void** pv = (void**)(PTR);\
+	vextend_s* ve = mem_extend(*pv);\
 	ve->max;\
 })
 
