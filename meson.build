@@ -40,6 +40,7 @@ src += [ 'src/datastructure/rbtree.c' ]
 src += [ 'src/datastructure/dict.c' ]
 src += [ 'src/datastructure/trie.c' ]
 src += [ 'src/datastructure/lbuffer.c' ]
+src += [ 'src/datastructure/bipbuffer.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -77,6 +78,7 @@ elif ut == 'datastructure'
   src += [ 'test/src/dict.c' ]
   src += [ 'test/src/trie.c' ]
   src += [ 'test/src/lbuffer.c' ]
+  src += [ 'test/src/bipbuffer.c' ]
 
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')

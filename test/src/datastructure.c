@@ -19,6 +19,7 @@ void uc_rbtree();
 void uc_dict(void);
 void uc_trie(void);
 void uc_lbuffer(void);
+void uc_bipbuffer(void);
 
 int main(){
 	if( MODE & 0x0001 ) uc_vector();
@@ -34,6 +35,7 @@ int main(){
 	if( MODE & 0x0400 ) uc_dict();
 	if( MODE & 0x0800 ) uc_trie();
 	if( MODE & 0x1000 ) uc_lbuffer();
+	if( MODE & 0x2000 ) uc_bipbuffer();
 
 	return 0;
 }
