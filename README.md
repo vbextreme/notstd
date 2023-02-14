@@ -5,6 +5,7 @@ If you not have Linux you can download and install, same for GCC, i think not ch
 
 State:
 ======
+* v0.0.13 add threads
 * v0.0.12 add lbuffer, iterator, map, foreach,
 * v0.0.11 add round down, aliasing help function, trie
 * v0.0.10 add unset in generic, vector bsearch, rbtree, map vector, dictionary 

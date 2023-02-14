@@ -1,7 +1,7 @@
 ###########
 # project #
 ###########
-project('notstd', 'c', version: '0.0.12')
+project('notstd', 'c', version: '0.0.13')
 
 cc = meson.get_compiler('c')
 
@@ -29,6 +29,7 @@ src += [ 'src/memory/protect.c' ]
 src += [ 'src/memory/extras.c' ]
 
 src += [ 'src/concurrency/futex.c' ]
+src += [ 'src/concurrency/threads.c' ]
 
 src += [ 'src/datastructure/map.c' ]
 src += [ 'src/datastructure/vector.c' ]
@@ -41,6 +42,7 @@ src += [ 'src/datastructure/dict.c' ]
 src += [ 'src/datastructure/trie.c' ]
 src += [ 'src/datastructure/lbuffer.c' ]
 src += [ 'src/datastructure/bipbuffer.c' ]
+
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -66,6 +68,11 @@ elif ut == 'delay'
   src += [ 'test/src/delay.c' ]
   type = 'executable'
   add_global_arguments('-DDELAY_DEBUG=1', language: 'c')
+elif ut == 'concurrency'
+  message('testing concurrency')
+  src += [ 'test/src/threads.c' ]
+  type = 'executable'
+  add_global_arguments('-DCONCURRENCY_DEBUG=1', language: 'c')
 elif ut == 'datastructure'
   message('testing datastructure')
   src += [ 'test/src/datastructure.c' ]
