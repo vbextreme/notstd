@@ -5,6 +5,7 @@ If you not have Linux you can download and install, same for GCC, i think not ch
 
 State:
 ======
+* v0.1.0  change versioning, add string and utf8 functionality
 * v0.0.13 add threads
 * v0.0.12 add lbuffer, iterator, map, foreach,
 * v0.0.11 add round down, aliasing help function, trie
