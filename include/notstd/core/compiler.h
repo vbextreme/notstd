@@ -83,4 +83,10 @@
 
 #define cpu_relax() __builtin_ia32_pause()
 
+#ifdef __clang__
+#	define _$(RET, ARGS, ...) NULL
+#else
+#	define _$(RET, ARGS, arg...) ({ RET _ ARGS arg _; }) 
+#endif
+
 #endif

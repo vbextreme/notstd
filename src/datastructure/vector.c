@@ -27,6 +27,18 @@ void vector_clear(void* v){
 	ve->count = 0;
 }
 
+void vector_count_set(void* v, size_t count){
+	void** pv = v;
+	iassert(pv && *pv);
+	vextend_s* ve = mem_extend(*pv);
+	if( count > ve->max ){
+		ve->max = count * 2;
+		*pv = mem_realloc(*pv, ve->max * ve->sof);
+		ve = mem_extend(*pv);
+	}
+	ve->count = count;
+}
+
 void* vector_resize(void* v, size_t count){
 	void** pv = v;
 	iassert(pv && *pv);

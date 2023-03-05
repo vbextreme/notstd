@@ -66,6 +66,9 @@ void* vector_new(size_t sof, size_t count);
 //set to 0 count of elements
 void vector_clear(void* v);
 
+// set number of element are used
+void vector_count_set(void* v, size_t count);
+
 //resize numbers of max elements you can have return *v
 void* vector_resize(void* v, size_t count);
 

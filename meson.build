@@ -43,6 +43,9 @@ src += [ 'src/datastructure/trie.c' ]
 src += [ 'src/datastructure/lbuffer.c' ]
 src += [ 'src/datastructure/bipbuffer.c' ]
 
+src += [ 'src/string/str.c' ]
+src += [ 'src/string/utf8.c']
+src += [ 'src/string/regex.c' ]
 
 #src += [ 'src/str.c', 'src/utf8.c', 'src/itoa.c', 'src/regex.c' ] #, 'src/rules.c' ]
 #src += [ 'src/serialize.c', 'src/customjson.c', 'src/ajson.c' ]
@@ -90,6 +93,11 @@ elif ut == 'datastructure'
   type = 'executable'
   add_global_arguments('-DDS_DEBUG=1', language: 'c')
   add_global_arguments('-DTEST_DATASTRUCTURE=@0@'.format(get_option('utvalue')), language: 'c')
+elif ut == 'string'
+  message('testing string')
+  src += [ 'test/src/string.c' ]
+  type = 'executable'
+  add_global_arguments('-DSTRING_DEBUG=1', language: 'c')
 endif
 
 ##############
