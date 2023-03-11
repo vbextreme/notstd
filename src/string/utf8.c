@@ -501,7 +501,7 @@ long utf8_tol(const utf8_t* str, const utf8_t** end, unsigned base, int* err){
 	char* e;
 	errno = 0;
 	long ret = strtol(s, &e, base);
-	if( errno || !end ){
+	if( errno || !e || e == s ){
 		if( err ) *err = 1;
 		if( !errno ) errno = EINVAL;
 		if( end )*end = str;
@@ -517,7 +517,7 @@ unsigned long utf8_toul(const utf8_t* str, const utf8_t** end, unsigned base, in
 	char* e;
 	errno = 0;
 	unsigned long ret = strtoul(s, &e, base);
-	if( errno || !end ){
+	if( errno || !e || e == s ){
 		if( err ) *err = 1;
 		if( !errno ) errno = EINVAL;
 		if( end ) *end = str;
@@ -536,7 +536,9 @@ utf8_t* utf8_chcp(utf8_t* dst, const utf8_t* src, unsigned nb){
 	return dst;
 }
 
-
+const utf8_t* utf8_line_end(const utf8_t* u){
+	return U8(strchrnul((const char*)u, '\n'));
+}
 
 
 

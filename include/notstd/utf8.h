@@ -93,6 +93,6 @@ long utf8_tol(const utf8_t* str, const utf8_t** end, unsigned base, int* err);
 unsigned long utf8_toul(const utf8_t* str, const utf8_t** end, unsigned base, int* err);
 
 utf8_t* utf8_chcp(utf8_t* dst, const utf8_t* src, unsigned nb);
-
+const utf8_t* utf8_line_end(const utf8_t* u);
 
 #endif

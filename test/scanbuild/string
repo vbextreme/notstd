@@ -1,0 +1,7 @@
+#!/bin/bash
+cd build
+meson configure -Dut='string' -Dutvalue='0x0'
+ninja clean
+ninja scan-build
+
+
