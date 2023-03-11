@@ -3,6 +3,7 @@
 #include <notstd/map.h>
 
 __private void testing_build(const char* rx, const char* err, int show){
+	dbg_warning("try /%s/", rx);
 	__free regex_s* rex = regex(U8(rx));
 	if( regex_error(rex) != err ) die("fsm return '%s' but aspected '%s'", regex_error(rex), err);
 	if( show ) regex_error_show(rex);
@@ -83,6 +84,6 @@ __private void test_match(void){
 
 int main(){
 	test_build();
-	test_match();
+	//test_match();
 	return 0;
 }

@@ -196,14 +196,19 @@ typedef struct bseq{
 	unsigned reverse;
 }bseq_s;
 
-__private fsmState_s* build_state_new(fsm_s* fsm, fsmStateType_e type){
+__private fsmState_s* state_get(fsm_s* fsm, unsigned id){
+	return &fsm->state[id];
+}
+
+__private unsigned state_new(fsm_s* fsm, fsmStateType_e type){
+	unsigned id = fsm->bcstate;
 	fsmState_s* state = vector_push(&fsm->state, NULL);
 	state->type  = type;
 	state->next  = ++fsm->bcstate;
 	state->flags = 0;
 	state->qn    = 0;
 	state->qm    = 0;
-	return state;
+	return id;
 }
 
 __private void state_ascii_uset(fsmState_s* state, ucs4_t st, ucs4_t en){
@@ -416,9 +421,10 @@ __private const utf8_t* quantifiers(fsm_s* fsm, const utf8_t* regex, unsigned* q
 	return regex;
 }
 
-__private fsmState_s* build_state_sequences_ascii(fsm_s* fsm, bseq_s* bs, unsigned qn, unsigned qm, unsigned greedy){
+__private unsigned build_state_sequences_ascii(fsm_s* fsm, bseq_s* bs, unsigned qn, unsigned qm, unsigned greedy){
 	dbg_info("create sequences ascii(%d)", bs->acount);
-	fsmState_s* state = build_state_new(fsm, FSM_STATE_ASCII);
+	unsigned idstate = state_new(fsm, FSM_STATE_ASCII);
+	fsmState_s* state = state_get(fsm, idstate);
 	state->qm = qm;
 	state->qn = qn;
 	if( !greedy ) state->flags |= FSM_STATE_FLAG_NGREEDY;
@@ -427,56 +433,59 @@ __private fsmState_s* build_state_sequences_ascii(fsm_s* fsm, bseq_s* bs, unsign
 		state_ascii_uset(state, bs->ascii[i].start, bs->ascii[i].end);
 	}
 	if( bs->reverse ) state_ascii_reverse(state);
-	return state;
+	return idstate;
 }
 
-__private fsmState_s* build_state_sequences_unicode(fsm_s* fsm, bseq_s* bs, unsigned qn, unsigned qm, unsigned greedy){
+__private unsigned build_state_sequences_unicode(fsm_s* fsm, bseq_s* bs, unsigned qn, unsigned qm, unsigned greedy){
 	dbg_info("create sequences unicode");
 	if( !bs->acount && bs->ucount == 1 ){
-		fsmState_s* unic = build_state_new(fsm, FSM_STATE_UNICODE);
+		unsigned idstate = state_new(fsm, FSM_STATE_UNICODE);
+		fsmState_s* unic = state_get(fsm, idstate);
 		unic->unicode.start = bs->unico[0].start;
 		unic->unicode.end   = bs->unico[0].end;
 		if( bs->reverse ) unic->flags |= FSM_STATE_FLAG_REVERSE;
 		dbg_info("create single unicode sequences: %u-%u", unic->unicode.start, unic->unicode.end);
-		return unic;
+		return idstate;
 	}
 
 	dbg_info("create sequences group");
-	fsmState_s* grpS = build_state_new(fsm, FSM_STATE_GROUP_START);
-	grpS->group.next = grpS->next;
+	unsigned idgrpstart = state_new(fsm, FSM_STATE_GROUP_START);
+	state_get(fsm,idgrpstart)->group.next = state_get(fsm, idgrpstart)->next;
 	uint32_t* ornext = NULL;
 
 	if( bs->acount ){
 		dbg_info("or ascii");
-		fsmState_s* grpOS = build_state_new(fsm, FSM_STATE_GROUP_START);
+		unsigned idgrporstart = state_new(fsm, FSM_STATE_GROUP_START);
 		build_state_sequences_ascii(fsm, bs, qn, qm, greedy);
-		fsmState_s* grpOE = build_state_new(fsm, FSM_STATE_GROUP_END);
-		grpOS->group.next = grpOE->next;
-		grpOE->next = 0;
-		grpOS->group.next = 0;
-		ornext = &grpOS->group.next;
+		unsigned idgrporend = state_new(fsm, FSM_STATE_GROUP_END);
+		state_get(fsm,idgrporstart)->group.next = state_get(fsm, idgrporend)->next;
+		state_get(fsm, idgrporend)->next = 0;
+		ornext = &state_get(fsm, idgrporstart)->group.next;
 	}
 
 	for( unsigned i = 0; i < bs->ucount; ++i ){
-		fsmState_s* grpOS = build_state_new(fsm, FSM_STATE_GROUP_START);
-		fsmState_s* unic = build_state_new(fsm, FSM_STATE_UNICODE);
+		unsigned idgrporstart = state_new(fsm, FSM_STATE_GROUP_START);
+
+		fsmState_s* unic = state_get(fsm, state_new(fsm, FSM_STATE_UNICODE));
 		unic->unicode.start = bs->unico[i].start;
 		unic->unicode.end   = bs->unico[i].end;
 		dbg_info("or unicode: %u-%u", unic->unicode.start, unic->unicode.end);
 		if( bs->reverse ) unic->flags |= FSM_STATE_FLAG_REVERSE;
-		fsmState_s* grpOE = build_state_new(fsm, FSM_STATE_GROUP_END);
-		grpOS->group.next = grpOE->next;
-		grpOE->next = 0;
-		grpOS->group.next = 0;
-		ornext = &grpOS->group.next;
+		
+		unsigned idgrporend = state_new(fsm, FSM_STATE_GROUP_END);
+		state_get(fsm,idgrporstart)->group.next = state_get(fsm, idgrporend)->next;
+		state_get(fsm, idgrporend)->next = 0;
+		ornext = &state_get(fsm, idgrporstart)->group.next;
 	}
 	
 	iassert(ornext);
 	*ornext = 0;
 	dbg_info("group sequences end");
-	fsmState_s* grpE = build_state_new(fsm, FSM_STATE_GROUP_END);
-	grpS->next = grpE->next;
-	return grpS;
+
+	unsigned idgrpend = state_new(fsm, FSM_STATE_GROUP_END);
+	state_get(fsm,idgrpstart)->next = state_get(fsm, idgrpend)->next;
+
+	return idgrpstart;
 }
 
 __private const utf8_t* build_sequences(fsm_s* fsm, const utf8_t* regex){
@@ -575,7 +584,7 @@ __private const utf8_t* build_string(fsm_s* fsm, const utf8_t* regex){
 	__private const char* sep   = "[]().";
 	
 	dbg_info("creating string:");
-	fsmState_s* state = build_state_new(fsm, FSM_STATE_STRING);
+	fsmState_s* state = state_get(fsm, state_new(fsm, FSM_STATE_STRING));
 	state->qm = 1;
 	state->qn = 1;
 	state->string.len = 0;
@@ -653,7 +662,7 @@ __private const utf8_t* build_dot(fsm_s* fsm, const utf8_t* regex){
 	regex = quantifiers(fsm, regex, &qn, &qm, &greedy);
 	if( fsm->err ) return regex;
 	dbg_info("create dot: %d %d", qn, qm);
-	fsmState_s* state = build_state_new(fsm, FSM_STATE_UNICODE);
+	fsmState_s* state = state_get(fsm, state_new(fsm, FSM_STATE_UNICODE));
 	state->qm = qm;
 	state->qn = qn;
 	if( !greedy ) state->flags |= FSM_STATE_FLAG_NGREEDY;
@@ -665,7 +674,7 @@ __private const utf8_t* build_dot(fsm_s* fsm, const utf8_t* regex){
 
 __private const utf8_t* build_backtrack(fsm_s* fsm, const utf8_t* regex){
 	dbg_info("create backtrack:\"%s\"", regex);
-	fsmState_s* state = build_state_new(fsm, FSM_STATE_BACKTRACK);
+	fsmState_s* state = state_get(fsm, state_new(fsm, FSM_STATE_BACKTRACK));
 	++regex;
 
 	if( *regex == '<' ){
@@ -811,32 +820,34 @@ __private const utf8_t* build_group(fsm_s* fsm, const utf8_t* regex, unsigned* g
 		if( fsm->err ) return regex;
 	}
 	
-	fsmState_s* grpS = build_state_new(fsm, FSM_STATE_GROUP_START);
-	grpS->group.next = grpS->next;
+	unsigned idgrpstart = state_new(fsm, FSM_STATE_GROUP_START);
+	fsmState_s* tmpState = state_get(fsm, idgrpstart);
+	tmpState->group.next = tmpState->next;
+	tmpState->group.id   = *gid;
 	uint32_t* ornext = NULL;
-	grpS->group.id   = *gid;
+	
 	if( name && len ){
-		memcpy(grpS->group.name, name, len);
-		grpS->group.name[len] = 0;
-		dbg_info("create new group <%s>", grpS->group.name);
+		memcpy(tmpState->group.name, name, len);
+		tmpState->group.name[len] = 0;
+		dbg_info("create new group <%s>", tmpState->group.name);
 	}
 	else{
-		dbg_info("create new group %d", grpS->group.id);
+		dbg_info("create new group %d", tmpState->group.id);
 	}
 
 	while( *regex && !fsm->err ){
 		dbg_info("or state new");
-		fsmState_s* grpOS = build_state_new(fsm, FSM_STATE_GROUP_START);
+		unsigned idgrporstart = state_new(fsm, FSM_STATE_GROUP_START);
 
 		regex = build_or(fsm, regex, gid);
 		if( fsm->err ) return regex;
 	
-		fsmState_s* grpOE = build_state_new(fsm, FSM_STATE_GROUP_END);
-		grpOS->group.next = grpOE->next;
-		grpOE->next = 0;
-		grpOS->group.next = 0;
+		unsigned idgrporend = state_new(fsm, FSM_STATE_GROUP_END);
 
-		ornext = &grpOS->group.next;
+		state_get(fsm,idgrporstart)->group.next = state_get(fsm, idgrporend)->next;
+		state_get(fsm, idgrporend)->next = 0;
+		ornext = &state_get(fsm, idgrporstart)->group.next;
+		
 		dbg_info("or state end");
 
 		if( *regex == ')' )	break;
@@ -847,8 +858,7 @@ __private const utf8_t* build_group(fsm_s* fsm, const utf8_t* regex, unsigned* g
 	}
 	if( fsm->err ) return regex;
 	iassert(ornext);
-	*ornext = 0;
-
+	if( ornext ) *ornext = 0;
 
 	if( *regex == ')' ){
 		if( virtual ){
@@ -862,15 +872,17 @@ __private const utf8_t* build_group(fsm_s* fsm, const utf8_t* regex, unsigned* g
 		return begin;
 	}
 
-	fsmState_s* grpE = build_state_new(fsm, FSM_STATE_GROUP_END);
-	grpS->next = virtual ? 0 : grpE->next;
+	unsigned idgrpend = state_new(fsm, FSM_STATE_GROUP_END);
+	state_get(fsm, idgrpstart)->next = virtual ? 0 : state_get(fsm, idgrpend)->next;
 
 	regex = quantifiers(fsm, regex, &qn, &qm, &greedy);
 	dbg_info("group end, quantifiers: %d %d", qn, qm);
-	grpS->qn = qn;
-	grpS->qm = qm;
-	if( !greedy ) grpS->flags |= FSM_STATE_FLAG_NGREEDY;
-	if( cap     ) grpS->flags |= FSM_STATE_FLAG_CAPTURE;
+
+	tmpState = state_get(fsm, idgrpstart);
+	tmpState->qn = qn;
+	tmpState->qm = qm;
+	if( !greedy ) tmpState->flags |= FSM_STATE_FLAG_NGREEDY;
+	if( cap     ) tmpState->flags |= FSM_STATE_FLAG_CAPTURE;
 
 	return regex;
 }
