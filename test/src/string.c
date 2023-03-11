@@ -84,6 +84,6 @@ __private void test_match(void){
 
 int main(){
 	test_build();
-	//test_match();
+	test_match();
 	return 0;
 }
