@@ -7,11 +7,15 @@ cc = meson.get_compiler('c')
 
 type = 'library'
 
+localPath = meson.current_source_dir()
+
 ###########
 # include #
 ###########
 
-includeDir = include_directories('include')
+includeDir  = include_directories('include', 'private', 'libjit/include')
+
+#includeDir += [ include_directories('
 
 ###############
 # source file #
@@ -178,7 +182,11 @@ endif
 ##########################
 # libraries dependencies #
 ##########################
-libDeps  = [ cc.find_library('m', required : true) ]       # math
+libDeps  = [ cc.find_library('m', required : true) ] # math
+libDeps += [ cc.find_library('jit', dirs: join_paths(localPath, 'libjit/jit/.libs/'), static: true, required : true) ] # libjit
+
+
+#libDeps += [ dependency('libjit', required: true) ]     # libjit for regex
 #libDeps += [ cc.find_library('rt', required : true) ]      # shared mem
 #libDeps += [ cc.find_library('dl', required : true) ]      # dynamic load
 #libDeps += [ cc.find_library('uring', required : true) ]   # iouring

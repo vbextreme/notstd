@@ -4,22 +4,28 @@
 #include <notstd/core.h>
 #include <notstd/vector.h>
 
-typedef enum { G_UNSET, G_CHAR, G_LONG, G_ULONG, G_FLOAT, G_LSTRING, G_STRING, G_VECTOR, G_OBJ } gtype_e;
+typedef enum { G_UNSET, G_CHAR, G_LONG, G_ULONG, G_FLOAT, G_LSTRING, G_STRING, G_VECTOR, G_SUB, G_OBJ } gtype_e;
 
 typedef struct generic generic_s;
+
+typedef struct subpart{
+	const void* start;
+	unsigned size;
+}subpart_s;
 
 struct generic{
 	gtype_e type;
 	union {
-		char c;
-		long l;
 		unsigned long ul;
-		double f;
-		char* str;
+		char        c;
+		long        l;
+		double      f;
+		char*       str;
 		const char* lstr;
-		void* obj;
-		generic_s* vec;
-		uintptr_t assign;
+		void*       obj;
+		generic_s*  vec;
+		uintptr_t   assign;
+		subpart_s   sub;
 	};
 };
 
@@ -38,6 +44,7 @@ inline generic_s gi_double(double v) { return (generic_s){ .type = G_FLOAT, .f =
 inline generic_s gi_str(char* v) { return (generic_s){ .type = G_STRING, .str = v}; }
 inline generic_s gi_lstr(const char* v) { return (generic_s){ .type = G_LSTRING, .lstr = v}; }
 inline generic_s gi_obj(void* v) { return (generic_s){ .type = G_OBJ, .obj = v}; }
+inline generic_s gi_sub(subpart_s v) { return (generic_s){ .type = G_SUB, .sub = v}; }
 inline generic_s gi_vec(generic_s* v) { return (generic_s){ .type = G_VECTOR, .vec = v}; }
 
 #define GI(VALUE) _Generic((VALUE),\
@@ -54,6 +61,7 @@ inline generic_s gi_vec(generic_s* v) { return (generic_s){ .type = G_VECTOR, .v
 	double     : gi_double,\
 	char*      : gi_str,\
 	const char*: gi_lstr,\
+	subpart_s  : gi_sub,\
 	generic_s* : gi_vec,\
 	default    : gi_obj\
 )(VALUE)
@@ -61,13 +69,14 @@ inline generic_s gi_vec(generic_s* v) { return (generic_s){ .type = G_VECTOR, .v
 inline int g_print(generic_s g){
 	switch( g.type ){
 		default: return printf("%p", g.obj);
-		case G_UNSET: return printf("unset");
-		case G_CHAR: return printf("%c", g.c);
-		case G_LONG: return printf("%ld", g.l);
-		case G_ULONG: return printf("%lu", g.ul);
-		case G_FLOAT: return printf("%f", g.f);
+		case G_UNSET  : return printf("unset");
+		case G_CHAR   : return printf("%c", g.c);
+		case G_LONG   : return printf("%ld", g.l);
+		case G_ULONG  : return printf("%lu", g.ul);
+		case G_FLOAT  : return printf("%f", g.f);
 		case G_LSTRING: return printf("%s", g.lstr);
-		case G_STRING: return printf("%s", g.str);
+		case G_STRING : return printf("%s", g.str);
+		case G_SUB    : return printf("(%p)[%u]", g.sub.start, g.sub.size);
 		case G_VECTOR:{
 			int ret = 0;
 			printf("[ ");
@@ -85,13 +94,14 @@ inline int g_print(generic_s g){
 inline int g_dump(generic_s g){
 	switch( g.type ){
 		default: return printf("pointer: %p", g.obj);
-		case G_UNSET: return printf("value unset");
-		case G_CHAR: return printf("char: '%c'", g.c);
-		case G_LONG: return printf("long: %ld", g.l);
-		case G_ULONG: return printf("ulong: %lu", g.ul);
-		case G_FLOAT: return printf("float: %f", g.f);
+		case G_UNSET  : return printf("value  : unset");
+		case G_CHAR   : return printf("char   : '%c'", g.c);
+		case G_LONG   : return printf("long   : %ld", g.l);
+		case G_ULONG  : return printf("ulong  : %lu", g.ul);
+		case G_FLOAT  : return printf("float  : %f", g.f);
 		case G_LSTRING: return printf("literal: '%s'", g.lstr);
-		case G_STRING: return printf("string: '%s'", g.str);
+		case G_STRING : return printf("string : '%s'", g.str);
+		case G_SUB    : return printf("subpart: (%p)[%u]", g.sub.start, g.sub.size);
 		case G_VECTOR:{
 			int ret = 0;
 			printf("[ ");

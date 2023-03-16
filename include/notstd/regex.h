@@ -5,6 +5,26 @@
 #include <notstd/utf8.h>
 #include <notstd/dict.h>
 
+#define REGEX_ERR_INTERNAL                "internal error"
+#define REGEX_ERR_INVALID_UTF_ESCAPE      "invalid utf escape"
+#define REGEX_ERR_UNOPENED_SEQUENCES      "unopened sequences"
+#define REGEX_ERR_UNOPENED_GROUP          "unopened group"
+#define REGEX_ERR_UNOPENED_QUANTIFIERS    "unopened quantifiers"
+#define REGEX_ERR_UNTERMINATED_SEQUENCES  "untermited sequences"
+#define REGEX_ERR_UNTERMINATED_GROUP      "untermited group"
+#define REGEX_ERR_UNTERMINATED_QUANTIFIER "unterminated quantifiers"
+#define REGEX_ERR_INVALID_QUANTIFIER      "invalid quantifier"
+#define REGEX_ERR_ASPECTED_SEQUENCES      "aspected sequences"
+#define REGEX_ERR_UNTERMINATED_GROUP_NAME "unterminated group name"
+
+typedef struct regex regex_t;
+
+regex_t* regex(const utf8_t* rx, unsigned flags);
+const char* regex_error(regex_t* rex);
+void regex_error_show(regex_t* rex);
+
+
+/*
 #define FSM_STATE_FLAG_NGREEDY 0x01
 #define FSM_STATE_FLAG_REVERSE 0x02
 #define FSM_STATE_FLAG_CAPTURE 0x04
@@ -119,7 +139,7 @@ void regex_error_show(regex_s* rex);
 dict_t* match(regex_s* rex, const utf8_t* txt, unsigned flags);
 capture_s* capture(dict_t* cap, unsigned id, const char* name);
 
-
+*/
 
 
 #endif

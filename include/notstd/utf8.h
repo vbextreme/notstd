@@ -94,5 +94,6 @@ unsigned long utf8_toul(const utf8_t* str, const utf8_t** end, unsigned base, in
 
 utf8_t* utf8_chcp(utf8_t* dst, const utf8_t* src, unsigned nb);
 const utf8_t* utf8_line_end(const utf8_t* u);
+utf8_t* utf8_dup(const utf8_t* src, unsigned len);
 
 #endif

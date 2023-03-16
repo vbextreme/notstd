@@ -2,6 +2,8 @@
 #include <notstd/regex.h>
 #include <notstd/map.h>
 
+//TODO not match last chars
+/*
 __private void testing_build(const char* rx, const char* err, int show){
 	dbg_warning("try /%s/", rx);
 	__free regex_s* rex = regex(U8(rx));
@@ -79,11 +81,15 @@ __private void testing_match(const char* rx, const char* txt, unsigned flags, in
 }
 
 __private void test_match(void){
-	testing_match("[a-z]+", "ciao mondo ", MATCH_FULL_TEXT | MATCH_CONTINUE_AFTER, 1);
+	testing_match("[a-z]+", "ciao mondo", MATCH_FULL_TEXT | MATCH_CONTINUE_AFTER, 1);
 }
-
+*/
 int main(){
-	test_build();
-	test_match();
+
+	__free regex_t* r = regex(U8("ciao(mondo) (come|va)* [sqen-ces]+"), 0);
+	regex_error_show(r);
+
+	//test_build();
+	//test_match();
 	return 0;
 }

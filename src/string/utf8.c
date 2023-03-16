@@ -1,4 +1,5 @@
 #include <notstd/utf8.h>
+#include <notstd/str.h>
 #include "utf8_property.h"
 
 size_t utf8_bytes_count(const utf8_t* u){
@@ -540,8 +541,9 @@ const utf8_t* utf8_line_end(const utf8_t* u){
 	return U8(strchrnul((const char*)u, '\n'));
 }
 
-
-
+utf8_t* utf8_dup(const utf8_t* src, unsigned len){
+	return (utf8_t*)str_dup((const char*)src, len);
+}
 
 
 
