@@ -1,0 +1,14 @@
+#!/bin/bash
+
+
+if [[ ! -d ./libjit ]]; then
+	git clone https://git.savannah.gnu.org/git/libjit.git
+	cd ./libjit
+else
+	cd ./libjit
+	git pull origin
+fi
+
+./bootstrap
+./configure
+make -j4
