@@ -167,7 +167,7 @@ void* vector_pop(void* v, __out void* ret){
 		void* src = (void*)(ADDR(*pv) + ve->count * ve->sof);
 		memcpy(ret, src, ve->sof);
 	}
-	return vector_shrink(v);
+	return ret;
 }
 
 void vector_shuffle(void* v, size_t begin, size_t end){

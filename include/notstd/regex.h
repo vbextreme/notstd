@@ -10,12 +10,15 @@
 #define REGEX_ERR_UNOPENED_SEQUENCES      "unopened sequences"
 #define REGEX_ERR_UNOPENED_GROUP          "unopened group"
 #define REGEX_ERR_UNOPENED_QUANTIFIERS    "unopened quantifiers"
+#define REGEX_ERR_UNOPENED_BACKREF_NAME   "unopened backreferences name"
 #define REGEX_ERR_UNTERMINATED_SEQUENCES  "untermited sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP      "untermited group"
 #define REGEX_ERR_UNTERMINATED_QUANTIFIER "unterminated quantifiers"
 #define REGEX_ERR_INVALID_QUANTIFIER      "invalid quantifier"
 #define REGEX_ERR_ASPECTED_SEQUENCES      "aspected sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP_NAME "unterminated group name"
+
+#define REGEX_FLAG_DISALBLE_LINE 0x01
 
 typedef struct regex regex_t;
 

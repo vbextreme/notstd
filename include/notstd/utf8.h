@@ -74,7 +74,7 @@ typedef enum {
 }utf8gbProperty_e;
 
 size_t utf8_bytes_count(const utf8_t* u);
-size_t utf8_codepoint_nb(utf8_t u);
+unsigned utf8_codepoint_nb(utf8_t u);
 const utf8_t* utf8_codepoint_next(const utf8_t* u);
 const utf8_t* utf8_codepoint_prev(const utf8_t* u, const utf8_t* start);
 size_t utf8_codepoint_count(const utf8_t* u);

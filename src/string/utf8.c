@@ -6,7 +6,7 @@ size_t utf8_bytes_count(const utf8_t* u){
 	return strlen((char*)u);
 }
 
-size_t utf8_codepoint_nb(utf8_t u){
+unsigned utf8_codepoint_nb(utf8_t u){
 	u >>= 4;
 	if( u == 0xF ) return 4;
 	if( u == 0xE ) return 3;

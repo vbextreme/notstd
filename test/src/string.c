@@ -85,9 +85,12 @@ __private void test_match(void){
 }
 */
 int main(){
+	
+void test(void);
+test();
 
-	__free regex_t* r = regex(U8("ciao(mondo) (come|va)* [sqen-ces]+"), 0);
-	regex_error_show(r);
+	//__free regex_t* r = regex(U8("ciao(mondo) (come|va)* [sqen-ces]+"), 0);
+	//regex_error_show(r);
 
 	//test_build();
 	//test_match();

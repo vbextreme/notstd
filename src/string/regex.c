@@ -1,21 +1,88 @@
 #include "jit/jit-type.h"
+#include "notstd/utf8.h"
 #include <notstd/regex.h>
 #include <notstd/vector.h>
 #include <notstd/str.h>
 #include <jit/jit.h>
 #include <jit.h>
 
-//TODO !greedy before state group
+/* perl regex:
+	Escape	                                          - partiale
+		\t tab - ok                                   - ok
+		\n newline - ok                               - ok
+		\r         - not support                      - not support
+		\f form feed - not support                    - not support
+		\a alarm (bell) - not support                 - not support
+		\e escape                                     - not support
+		\cK control char                              - not support
+		\x{}, \x00  hexadecimal char                  - not support
+		\N{name}    named Unicode char                - not support
+		\N{U+263D}  Unicode character                 - supported with \U
+		\o{}, \000  octal char                        - not support
+		\l          lowercase next char               - not support
+		\u          uppercase next char               - not support
+		\L          lowercase until \E                - not support
+		\U          uppercase until \E                - not support
+		\Q          quote (disable) pattern \E        - not support
+		\E          end either modification or quoted - not support
+		\UXXXX \U+XXXX unicode                        - different in perl, perl use \U for other feature and \N{U+XXXX} for unicode
+
+	Class                - partial
+		[...] sequences  - ok
+		\w [a-zA-Z_,.;]  - not support
+		\W [^a-zA-Z_,.;] - not support
+		\s [ \t]         - not support
+		\S [^ \t]        - not support
+		\d [0-9]         - not support
+		\D [^0-9]        - not support
+		others           - not support
+
+	quantifier                - ok
+		* 0, UINT32_t         - ok
+		+ 1, UINT32_t         - ok
+		? 0, 1                - ok
+		{n} == n              - ok
+		{n,} >= n, < UINT32_t - ok
+		{,m} >= 0, < m        - ok
+		{n,m} >= n, <= m      - ok
+		quantifier? lazy      - ok
+
+	backreferences            - partial
+		\nnn                  - ok
+		\g{name}              - ok
+		\gN \g{N}             - not support
+		\k                    - not support
+
+	Extended Pattern                       - partial               
+		(? ) check flags                   - ok
+		(? (?)) sub flags                  - not support
+		(?...:) flags from ? to :          - ok
+		# comment                          - not support
+		i case insensitive                 - not support
+		: dont capture                     - ok
+		^ dont inherit the flags           - not support
+		| reset capture count              - ok
+		= match but not include in capture - not support
+		! is not and not include           - not support
+		<= lockbehind                      - not support
+		<! reverse lockbehind              - not support
+		>                                  - not support
+		<name> use capture name            - ok
+		'name' use capture name            - ok
+		{code} execute code                - not support
+		(condition)                        - not support
+		?{code}                            - not support
+		&NAME                              - not support
+*/
+
+typedef struct state state_s;
 
 typedef enum type{
 	RX_STRING,
 	RX_SINGLE,
 	RX_SEQUENCES,
-	RX_QUANTIFIERS,
-	RX_BACKTRACK,
-	RX_GROUP,
-	RX_GROUP_END,
-	RX_GROUP_OR
+	RX_BACKREF,
+	RX_GROUP
 }type_e;
 
 typedef struct quantifier{
@@ -24,77 +91,62 @@ typedef struct quantifier{
 	unsigned greedy;
 }quantifier_s;
 
-typedef struct string{
-	utf8_t* str;
-}string_s;
-
-typedef struct single{
-	ucs4_t u;
-}single_s;
-
 typedef struct range{
 	ucs4_t start;
 	ucs4_t end;
 }range_s;
 
 typedef struct sequences{
+	uint32_t ascii[8];
 	range_s* range;
 	unsigned reverse;
+	unsigned asciiset;
 }sequences_s;
 
-typedef struct backtrack{
+typedef struct backref{
 	unsigned id;
-	char* name;
-}backtrack_s;
+	utf8_t* name;
+}backref_s;
 
 #define GROUP_FLAG_CAPTURE     0x01
 #define GROUP_FLAG_COUNT_RESET 0x02
+#define GROUP_FLAG_NAMED       0x04
 
 typedef struct group{
-	long idgroup;
-	unsigned flags;
-	unsigned id;
-	char*    name;
+	unsigned  flags;
+	unsigned  id;
+	utf8_t*   name;
+	state_s** state;
 }group_s;
 
-typedef struct state{
-	type_e       type;
-	quantifier_s quantifier;
-	jit_function_t statefn;
-	jit_function_t quantifierfn;
-	unsigned build;
-	union{
-		string_s    string;
-		single_s    single;
-		sequences_s sequences;
+struct state{
+	type_e         type;
+	quantifier_s   quantifier;
+	jit_function_t fn;
+	union {
+		utf8_t*     string;
+		ucs4_t      u;
+		sequences_s seq;
+		backref_s   backref;
 		group_s     group;
-		backtrack_s backtrack;
 	};
-}state_s;
+};
 
 typedef struct rxch{
 	ucs4_t code;
 	uint32_t nb;
 }rxch_s;
 
-typedef struct jtype{
-	_type utf8;
-	_type str;
-	_type dict;
-}jtype_s;
-
 typedef struct jproto{
-	_type memcmp;
-	_type utf8nb;
-	_type utf8ucs4;
 	_type state;
-	_type btcheck;
+	_type brnamed;
+	_type brindex;
 }jproto_s;
 
 struct regex{
 	jit_s         jit;
-	jtype_s       type;
 	jproto_s      proto;
+	state_s       state;
 	const utf8_t* rx;
 	const char*   err;
 	const utf8_t* last;
@@ -139,19 +191,133 @@ __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 	return ch;
 }
 
-__private state_s* state_string(state_s** state, const utf8_t** rxu8, const char** err){
+__private int parse_quantifier(quantifier_s* q, const utf8_t** rxu8, const char** err){
+	dbg_info("quantifiers");
+	q->greedy = 1;
+
+	const utf8_t* u8 = *rxu8;
+	switch( *u8 ){
+		default : q->n = 1; q->m = 1; break;
+		case '?': q->n = 0, q->m = 1; ++u8; break;
+		case '*': q->n = 0, q->m = UINT32_MAX; ++u8; break;
+		case '+': q->n = 1, q->m = UINT32_MAX; ++u8; break;
+		case '{':
+			u8 = (const utf8_t*)str_skip_h((const char*)(u8+1));
+			if( !*u8 || *u8 == '}' ){
+				*err = REGEX_ERR_UNTERMINATED_QUANTIFIER;
+				return -1;
+			}
+
+			if( *u8 == ',' ){
+				q->n = 0;
+			}
+			else{
+				const utf8_t* end;
+				int e;
+				q->n = utf8_toul(u8, &end, 10, &e);
+				if( e ){
+					*err = strerror(errno);
+					*rxu8 = u8;
+					return -1;
+				}
+				u8 = (const utf8_t*)str_skip_h((const char*)end);
+			}
+			
+			if( *u8 == ',' ){
+				u8 = (const utf8_t*)str_skip_h((const char*)(u8+1));
+				if( *u8 == '}' ){
+					q->m = UINT32_MAX;
+				}
+				else{
+					const utf8_t* end;
+					int e;
+					q->m = utf8_toul(u8, &end, 10, &e);
+					if( e ){
+						*err = strerror(errno);
+						*rxu8 = u8;
+						return -1;
+					}
+					u8 = (const utf8_t*)str_skip_h((const char*)end);
+				}
+			}
+			else if( *u8 == '}' ){
+				q->m = q->n;
+			}
+
+			if( *u8 != '}' ){
+				*err = REGEX_ERR_UNTERMINATED_QUANTIFIER;
+				return -1;
+			}
+			++u8;
+		break;
+	}
+	
+	if( *u8 == '?' ){
+		q->greedy = 0;
+		++u8;
+	}
+	
+	*rxu8 = u8;
+	return 0;
+}
+
+state_s* state_ctor(state_s* s){
+	s->fn = NULL;
+	return s;
+}
+
+__private void _make_lazy(regex_t* rx, jit_s* self, _value c0, _value aDict, _value aU8, _value u8, _value match, _value qn, _fn lazy){
+	if( !lazy ) return;
+	_if(self, match, _ge, qn);
+		_value ret = _call(self, rx->proto.state, lazy, (_value[]){aDict, aU8, _sub(self, u8, aU8)}, 3);
+		_if(self, ret, _gt, c0);
+			_return(self, _sub(self, u8, aU8));
+		_endif(self);
+	_endif(self);
+}
+
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/*************** STATE STRING ***************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+
+__private _fn make_fn_string_cmp(regex_t* rx, const utf8_t* str, unsigned len){
+	jit_s* self = &rx->jit;
+	
+	_function(self, rx->proto.state, 3);
+		_value aIndex = _pop(self);
+		_value aU8 = _pop(self);
+		//unused _value aDict
+		_pop(self);
+
+		_value cstr = _constant_ptr(self, _putf8, str);
+		_value clen = _constant_inum(self, _uint, len);
+		_value c0   = _constant_inum(self, _int, 0);
+		_value ce   = _constant_inum(self, _long, -1);
+		
+		_value cmp  = _utf8_ncmp(self, cstr, _add(self, aU8, aIndex), clen);
+		_if(self, cmp, _ne, c0);
+			_return(self, _mul(self, aIndex, ce));
+		_endif(self);
+		_return(self, _add(self, aIndex, clen));
+	return _endfunction(self);
+}
+
+__private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, const char** err){
 	const utf8_t* u8 = *rxu8;
 
-	utf8_t* str = MANY(utf8_t, 8);
-	unsigned size = 4;
+	unsigned size = 9;
+	utf8_t* str = MANY(utf8_t, size);
 	unsigned len  = 0;
 
-	state_s* s = vector_push(state, NULL);
-	s->build = 0;
 	s->type = RX_STRING;
-	s->quantifier.m = 1;
-	s->quantifier.n = 1;
-	s->quantifier.greedy = 1;
 
 	while( *u8 && *u8 != '(' && *u8 != ')' && *u8 != '[' && *u8 != ']' && *u8 != '|' ){
 		rxch_s ch = parse_get_ch(u8, err);
@@ -176,105 +342,288 @@ __private state_s* state_string(state_s** state, const utf8_t** rxu8, const char
 	str[len] = 0;
 	str = RESIZE(utf8_t, str, len+1);
 	
-	s->string.str = str;
-	dbg_info("gift string(%s)", str);
-	mem_gift(str, *state);
+	s->string = str;
+	mem_gift(str, rx);
 	*rxu8 = u8;
+
+	dbg_info("state string '%s'", s->string);
 	return s;
 }
 
-__private state_s* state_single(state_s** state, const utf8_t** rxu8, rxch_s ch){
-	dbg_info("single");
-	state_s* s = vector_push(state, NULL);
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/*************** STATE SINGLE ***************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+/********************************************/
+
+__private _fn make_fn_single_cmp(regex_t* rx, ucs4_t u, quantifier_s* quantifier, _fn lazy){
+	jit_s* self = &rx->jit;
+	
+	_function(self, rx->proto.state, 3);
+		_value aIndex = _pop(self);
+		_value aU8    = _pop(self);
+		_value aDict  = _pop(self);
+
+		_value u4   = _constant_inum(self, _ucs4, u);
+		_value cn   = _constant_inum(self, _uint, '\n');
+		_value c0   = _constant_inum(self, _int, 0);
+		_value c1   = _constant_inum(self, _int, 1);
+		_value ce   = _constant_inum(self, _long, -1);
+		_value qn   = _constant_inum(self, _uint, quantifier->n);
+		_value qm   = _constant_inum(self, _uint, quantifier->m);
+		
+		_value match = _variable(self, _uint);
+		_clr(self, match);
+		_value u8 = _add(self, aU8, aIndex);
+
+		_do(self);
+			_make_lazy(rx, self, c0, aDict, aU8, u8, match, qn, lazy);
+
+			_value ch = _utf8_to_ucs4(self, u8);
+			_if(self, ch, _eq, u4);
+				_store(self, match, _add(self, match, c1));
+
+				_value nb = _utf8_codepoint_nb(self, _deref(self, _utf8, u8));
+				_store(self, u8, _add(self, u8, nb));
+
+				ch = _deref(self, _utf8, u8);
+				if( rx->flags & REGEX_FLAG_DISALBLE_LINE ){
+					_if(self, ch, _eq, c0);
+				}
+				else{
+					_if_or(self, ch, _eq, c0, ch, _eq, cn);
+				}
+					_break(self);
+				_endif(self);
+			_else(self);
+				_break(self);
+			_endif(self);
+		_end_while(self, match, _le, qm);
+		
+		_if(self, match, _lt, qn);
+			_return(self, _mul(self, _sub(self, u8, aU8), ce));
+		_endif(self);
+		_return(self, _sub(self, u8, aU8));
+	return _endfunction(self);
+}
+
+__private state_s* state_single(__unused regex_t* rx, state_s* s, const utf8_t** rxu8, rxch_s ch){
 	s->type = RX_SINGLE;
-	s->build = 0;
-	s->quantifier.n = 1;
-	s->quantifier.m = 1;
-	s->quantifier.greedy = 1;
-	s->single.u = ch.code;
+	dbg_info("state single %u", ch.code);
+	s->u = ch.code;
 	*rxu8 += ch.nb;
 	return s;
 }
 
-__private state_s* state_dot(state_s** state, const utf8_t** rxu8){
-	dbg_info("dot");
-	state_s* s = vector_push(state, NULL);
-	s->build = 0;
+/***********************************************/
+/***********************************************/
+/***********************************************/
+/***********************************************/
+/***********************************************/
+/*************** STATE SEQUENCES ***************/
+/***********************************************/
+/***********************************************/
+/***********************************************/
+/***********************************************/
+/***********************************************/
+
+__private _fn make_fn_sequences_cmp(regex_t* rx, sequences_s* seq, quantifier_s* quantifier, _fn lazy){
+	jit_s* self = &rx->jit;
+	
+	_function(self, rx->proto.state, 3);
+		_value aIndex = _pop(self);
+		_value aU8    = _pop(self);
+		_value aDict  = _pop(self);
+
+		_value cn   = _constant_inum(self, _uint, '\n');
+		_value c0   = _constant_inum(self, _int, 0);
+		_value c1   = _constant_inum(self, _int, 1);
+		_value c3   = _constant_inum(self, _int, 3);
+		_value c4   = _constant_inum(self, _int, 4);
+		_value c7   = _constant_inum(self, _int, 7);
+		_value c256 = _constant_inum(self, _int, 256);
+		_value ce   = _constant_inum(self, _long, -1);
+		_value qn   = _constant_inum(self, _uint, quantifier->n);
+		_value qm   = _constant_inum(self, _uint, quantifier->m);
+		_value tb   = _constant_ptr(self, _ucs4, seq->ascii);
+		_value vs[32];
+		_value ve[32];
+		
+		unsigned countr = vector_count(&seq->range);
+		if( countr >= 32 ) die("todo add support for more range");
+		for( unsigned i = 0; i < countr; ++i ){
+			vs[i] = _constant_inum(self, _ucs4, seq->range[i].start);
+			ve[i] = _constant_inum(self, _ucs4, seq->range[i].end);
+		}
+
+		_value match = _variable(self, _uint);
+		_clr(self, match);
+		_value u8 = _add(self, aU8, aIndex);
+
+		_do(self);
+			_make_lazy(rx, self, c0, aDict, aU8, u8, match, qn, lazy);
+			
+			_value ch = _utf8_to_ucs4(self, u8);
+			_lbl   nextmatch = _lbl_undef;
+
+			if( seq->asciiset ){
+				_if(self, ch, _lt, c256);
+					// i = (tb[ch & 7]
+					_value lut = _deref(self, _ucs4, _add(self, tb, _mul(self, _and(self, ch, c7), c4)));
+					//ch >>= 3;
+					_value num = _shr(self, ch, c3);
+					// lut & (1<<ch)
+					_if(self, _and(self, lut, _shl(self, c1, num)), _eq, c0);
+						_break(self);
+					_else(self);
+						_goto(self, &nextmatch);
+					_endif(self);
+				_endif(self);
+			}
+			else{
+				_if(self, ch, _lt, c256);
+					_break(self);
+				_endif(self);
+			}
+			
+			if( countr > 0 ){
+				_if_and(self, ch, _ge, vs[0], ch, _le, ve[0]);
+					if( seq->reverse ){
+						_break(self);
+					}
+					else{
+						_goto(self, &nextmatch);
+					}
+				for( unsigned i = 1; i < countr; ++i ){
+					_elif_and(self, ch, _ge, vs[i], ch, _le, ve[i]);
+					if( seq->reverse ){
+						_break(self);
+					}
+					else{
+						_goto(self, &nextmatch);
+					}
+				}
+				_endif(self);
+			}	
+
+			_label(self, &nextmatch);
+			_store(self, match, _add(self, match, c1));
+			_value nb = _utf8_codepoint_nb(self, _deref(self, _utf8, u8));
+			_store(self, u8, _add(self, u8, nb));
+			ch = _deref(self, _utf8, u8);
+			if( rx->flags & REGEX_FLAG_DISALBLE_LINE ){
+				_if(self, ch, _eq, c0);
+			}
+			else{
+				_if_or(self, ch, _eq, c0, ch, _eq, cn);
+			}
+				_break(self);
+			_endif(self);
+		_end_while(self, match, _le, qm);
+		
+		_if(self, match, _lt, qn);
+			_return(self, _mul(self, _sub(self, u8, aU8), ce));
+		_endif(self);
+		_return(self, _sub(self, u8, aU8));
+	return _endfunction(self);
+}
+
+__private void seq_ctor(sequences_s* seq){
+	memset(seq->ascii, 0, sizeof(seq->ascii));
+	seq->range = VECTOR(range_s, 2);
+	seq->asciiset = 0;
+	seq->reverse  = 0;
+}
+
+__private void seq_add(sequences_s* seq, ucs4_t st, ucs4_t en){
+	if( st < 256 ){
+		if( en > 255 ){
+			range_s* r = vector_push(&seq->range, NULL);
+			r->start = 256;
+			r->end   = en;
+			en = 255;
+		}
+		for( ucs4_t a = st; a <= en; ++a ){
+			unsigned i = a & 7;
+			seq->ascii[i] |= 1 << (a>>3);
+		}
+		seq->asciiset = 1;
+	}
+	else{
+		range_s* r = vector_push(&seq->range, NULL);
+		r->start = st;
+		r->end   = en;
+	}
+}
+
+__private int range_cmp(const void* a, const void* b){ return ((range_s*)a)->start - ((range_s*)b)->start; }
+
+__private void seq_merge(sequences_s* seq, unsigned disableline){	
+	if( seq->reverse && seq->asciiset ){
+		for( unsigned i = 0; i < 8; ++i ){
+			seq->ascii[i] = ~seq->ascii[i];
+		}
+	}
+
+	if( !disableline ){
+		unsigned i = '\n' & 0x7;
+		seq->ascii[i] &= ~( 1 << ('n'>>3));
+	}
+
+	vector_qsort(&seq->range, range_cmp);
+	unsigned i = 0;
+	while( i < vector_count(&seq->range) - 1 ){
+		range_s* r[2] = { &seq->range[i], &seq->range[i+1] };
+		if( r[1]->start <= r[0]->end + 1 ){
+			if( r[0]->end < r[1]->end ) r[0]->end = r[1]->end;
+			vector_remove(&seq->range, i+1, 1);
+			continue;
+		}
+		++i;
+	}
+}
+
+__private state_s* state_dot(regex_t* rx, state_s* s, const utf8_t** rxu8){
+	dbg_info("state dot");
+
 	s->type = RX_SEQUENCES;
-	s->quantifier.n = 1;
-	s->quantifier.m = 1;
-	s->quantifier.greedy = 1;
-	s->sequences.reverse = 0;
-	s->sequences.range = VECTOR(range_s, 2);
-	dbg_info("gift range");
-	mem_gift(s->sequences.range, *state);
-	range_s* r = vector_push(&s->sequences.range, NULL);
-	r->start = 1;
-	r->end   = UINT32_MAX;
+	seq_ctor(&s->seq);
+
+	if( rx->flags & REGEX_FLAG_DISALBLE_LINE ){
+		seq_add(&s->seq, 1, UINT32_MAX);
+	}
+	else{
+		seq_add(&s->seq, 1, '\n'-1);
+		seq_add(&s->seq, '\n'+1, UINT32_MAX);
+	}
+	
 	*rxu8 += 1;
 	return s;
 }
 
-__private state_s* state_backtrack(state_s** state, const utf8_t** rxu8, const char** err){
-	dbg_info("backtrack");
-	state_s* s = vector_push(state, NULL);
-	s->build = 0;
-	s->type = RX_BACKTRACK;
-	s->quantifier.n = 1;
-	s->quantifier.m = 1;
-	s->quantifier.greedy = 1;
-	s->backtrack.id = 0;
-	s->backtrack.name = NULL;
+__private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8, const char** err){
+	dbg_info("state sequences");
 
-	++(*rxu8);
-	if( **rxu8 == '<' ){
-		const utf8_t* n = *rxu8+1;
-		const utf8_t* u8 = n;
-		while( *u8 && *u8 != '>' ) ++u8;
-		if( *u8 != '>' ){
-			*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
-			return NULL;
-		}
-		*rxu8 = u8+1;
-		s->backtrack.name = str_dup((const char*)n, u8-n);
-		dbg_info("gift backtrack name");
-		mem_gift(s->backtrack.name, *state);
-	}
-	else{
-		int e;
-		s->backtrack.id = utf8_toul(*rxu8, rxu8, 10, &e);
-		if( e ){
-			*err = strerror(errno);
-			return NULL;
-		}
-	}
-
-	return s;
-}
-__private int range_cmp(const void* a, const void* b){ return ((range_s*)a)->start - ((range_s*)b)->start; }
-
-__private state_s* state_sequences(state_s** state, const utf8_t** rxu8, const char** err){
-	dbg_info("sequences");
-	state_s* s = vector_push(state, NULL);
-	s->build = 0;
 	s->type = RX_SEQUENCES;
-	s->quantifier.n = 1;
-	s->quantifier.m = 1;
-	s->quantifier.greedy = 1;
-	s->sequences.reverse = 0;
-	s->sequences.range = VECTOR(range_s, 2);
+	seq_ctor(&s->seq);
 
 	const utf8_t* u8 = *rxu8;
 	++u8;
 
 	if( !*u8 ){
-		mem_gift(s->sequences.range, *state);
+		mem_free(s->seq.range);
 		*err = REGEX_ERR_UNTERMINATED_SEQUENCES;
 		return NULL;
 	}
 	
 	if( *u8 == '^' ){
-		s->sequences.reverse = 1;
+		s->seq.reverse = 1;
 		++u8;
 	}
 
@@ -283,11 +632,10 @@ __private state_s* state_sequences(state_s** state, const utf8_t** rxu8, const c
 		ucs4_t en;
 		rxch_s ch = parse_get_ch(u8, err);
 		if( ch.nb == UINT32_MAX ){
-			mem_gift(s->sequences.range, *state);
+			mem_free(s->seq.range);
 			*rxu8 = u8;
 			return NULL;
 		}
-		
 		en = st = ch.code;
 		u8 += ch.nb;
 
@@ -295,7 +643,7 @@ __private state_s* state_sequences(state_s** state, const utf8_t** rxu8, const c
 			++u8;
 			rxch_s ch = parse_get_ch(u8, err);
 			if( ch.nb == UINT32_MAX ){
-				mem_gift(s->sequences.range, *state);
+				mem_free(s->seq.range);
 				*rxu8 = u8;
 				return NULL;
 			}
@@ -303,108 +651,442 @@ __private state_s* state_sequences(state_s** state, const utf8_t** rxu8, const c
 			u8 += ch.nb;
 		}
 
-		range_s* r = vector_push(&s->sequences.range, NULL);
-		r->start = st;
-		r->end   = en;
+		seq_add(&s->seq, st, en);
 	}
 
 	if( *u8 != ']' ){
-		mem_gift(s->sequences.range, *state);
+		mem_free(s->seq.range);
 		*err = REGEX_ERR_UNTERMINATED_SEQUENCES;
 		return NULL;
 	}
 	
-	if( !vector_count(&s->sequences.range) ){
-		mem_gift(s->sequences.range, *state);
+	if( !vector_count(&s->seq.range) ){
+		mem_free(s->seq.range);
 		*err = REGEX_ERR_ASPECTED_SEQUENCES;
 		return NULL;
 	}
 
-	//merge sequences
-	vector_qsort(&s->sequences.range, range_cmp);
-	unsigned i = 0;
-	while( i < vector_count(&s->sequences.range) - 1 ){
-		range_s* r[2] = { &s->sequences.range[i], &s->sequences.range[i+1] };
-		if( r[1]->start <= r[0]->end + 1 ){
-			if( r[0]->end < r[1]->end ) r[0]->end = r[1]->end;
-			vector_remove(&s->sequences.range, i+1, 1);
-			continue;
-		}
-		++i;
-	}
+	seq_merge(&s->seq, rx->flags & REGEX_FLAG_DISALBLE_LINE);
 
-	mem_gift(s->sequences.range, *state);
+	mem_gift(s->seq.range, rx);
 	*rxu8 = u8+1;
 	return s;
 }
 
-__private int state_group_flags(const utf8_t** rxu8, char** name, unsigned* flags, const char** err){
-	dbg_info("group flags");
-	const utf8_t* u8= *rxu8;
-	unsigned r      = 0;
-	const utf8_t* n = NULL;
-	unsigned l      = 0;
-	unsigned c      = 1;
-	
-	*flags = GROUP_FLAG_CAPTURE;
-	*name  = NULL;
+/*********************************************/
+/*********************************************/
+/*********************************************/
+/*********************************************/
+/*********************************************/
+/*************** STATE BACKREF ***************/
+/*********************************************/
+/*********************************************/
+/*********************************************/
+/*********************************************/
+/*********************************************/
 
-	while( *u8 ){
-		switch( *u8 ){
-			case '|': r = 1; break;
-			case '!': c = 0; break;
-
-			case '<':
-				n = ++u8;
-				while( *u8 && *u8 != '>' && *u8 !=':' ) ++u8;
-				if( *u8 == ':' ){
-					*rxu8 = n;
-					*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
-					return -1;
-				}
-				l = u8 - n;
-				if( *u8 != '>' ) return 0;
-				++u8;
-			break;
-
-			case ':':
-				if( l ) *name = str_dup((char*)n, l);
-				if( r ) *flags |= GROUP_FLAG_COUNT_RESET;
-				if( !c ) *flags &= ~GROUP_FLAG_CAPTURE;
-				*rxu8 = u8+1;
-			return 0;
-
-			default : return 0;
-		}
-	}
-
-	return 0;
+__private long backref_named_cmp(const char* name, dict_t* dic, const utf8_t* u8, unsigned index){
+	generic_s* g = dict(dic, name);
+	if( g->type == G_UNSET ) return (long)index * -1;
+	if( strncmp(g->sub.start, (const char*)(u8+index), g->sub.size) ) return (long)index *-1;
+	return index + g->sub.size;
 }
 
-__private state_s* state_group(state_s** state, const utf8_t** rxu8, const char** err){
-	dbg_info("group");
-	state_s* s = vector_push(state, NULL);
-	s->build = 0;
-	s->type = RX_GROUP;
-	s->quantifier.n = 1;
-	s->quantifier.m = 1;
-	s->quantifier.greedy = 1;
-	s->group.idgroup = -1;
-	s->group.id = 0;
-	s->group.flags = 0;
-	s->group.name = NULL;
+__private long backref_index_cmp(unsigned id, dict_t* dic, const utf8_t* u8, unsigned index){
+	generic_s* g = dict(dic, id);
+	if( g->type == G_UNSET ) return (long)index * -1;
+	if( strncmp(g->sub.start, (const char*)(u8+index), g->sub.size) ) return (long)index *-1;
+	return index + g->sub.size;
+}
+
+__private _fn make_fn_backref_cmp(regex_t* rx, backref_s* br, quantifier_s* quantifier, _fn lazy){
+	jit_s* self = &rx->jit;
+	
+	_function(self, rx->proto.state, 3);
+		_value aIndex = _pop(self);
+		_value aU8    = _pop(self);
+		_value aDict  = _pop(self);
+
+		_value cn   = _constant_inum(self, _uint, '\n');
+		_value c0   = _constant_inum(self, _int, 0);
+		_value c1   = _constant_inum(self, _int, 1);
+		_value ce   = _constant_inum(self, _long, -1);
+		_value qn   = _constant_inum(self, _uint, quantifier->n);
+		_value qm   = _constant_inum(self, _uint, quantifier->m);
+		_value bn   = _constant_ptr(self, _char, br->name);
+		_value bi   = _constant_inum(self, _uint, br->id);
+
+		_value match = _variable(self, _uint);
+		_clr(self, match);
+		_value u8 = _add(self, aU8, aIndex);
+
+		_do(self);
+			_make_lazy(rx, self, c0, aDict, aU8, u8, match, qn, lazy);
+
+			_value ret;
+			if( br->name ){
+				ret = _call_native(self, rx->proto.brnamed, backref_named_cmp, (_value[]){ bn, aDict, u8, aIndex}, 4);
+			}
+			else{
+				ret = _call_native(self, rx->proto.brnamed, backref_index_cmp, (_value[]){ bi, aDict, u8, aIndex}, 4);
+			}
+			_if(self, ret, _le, c0);
+				_break(self);
+			_endif(self);
+
+			_store(self, match, _add(self, match, c1));
+			u8 = _add(self, aU8, ret);
+			
+			_value ch = _deref(self, _utf8, u8);
+			if( rx->flags & REGEX_FLAG_DISALBLE_LINE ){
+				_if(self, ch, _eq, c0);
+			}
+			else{
+				_if_or(self, ch, _eq, c0, ch, _eq, cn);
+			}
+				_break(self);
+			_endif(self);
+		_end_while(self, match, _le, qm);
+		
+		_if(self, match, _lt, qn);
+			_return(self, _mul(self, _sub(self, u8, aU8), ce));
+		_endif(self);
+		_return(self, _sub(self, u8, aU8));
+	return _endfunction(self);
+}
+
+__private state_s* state_backreferences(regex_t* rx, state_s* s, const utf8_t** rxu8, const char** err){
+	dbg_info("state backreferences");
+
+	s->type = RX_BACKREF;
+	s->backref.id   = 0;
+	s->backref.name = NULL;
 
 	++(*rxu8);
-
-	if( state_group_flags(rxu8, &s->group.name, &s->group.flags, err) ) return NULL;
-	if( s->group.name ){
-		dbg_info("gift group name");
-		mem_gift(s->group.name, *state);
+	if( **rxu8 == 'g' ){
+		++(*rxu8);
+		if( **rxu8 != '{' ){
+			*err = REGEX_ERR_UNOPENED_BACKREF_NAME;
+			return NULL;
+		}
+		const utf8_t* n = *rxu8+1;
+		const utf8_t* u8 = n;
+		while( *u8 && *u8 != '}' ) ++u8;
+		if( *u8 != '}' ){
+			*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
+			return NULL;
+		}
+		*rxu8 = u8+1;
+		s->backref.name = utf8_dup(n, u8-n);
+		mem_gift(s->backref.name, rx);
+	}
+	else{
+		int e;
+		s->backref.id = utf8_toul(*rxu8, rxu8, 10, &e);
+		if( e ){
+			*err = strerror(errno);
+			return NULL;
+		}
 	}
 
 	return s;
 }
 
+/*******************************************/
+/*******************************************/
+/*******************************************/
+/*******************************************/
+/*******************************************/
+/*************** STATE GROUP ***************/
+/*******************************************/
+/*******************************************/
+/*******************************************/
+/*******************************************/
+/*******************************************/
+
+__private _fn make_fn_group_cmp(regex_t* rx, group_s* grp, quantifier_s* quantifier, _fn lazy){
+	jit_s* self = &rx->jit;
+	
+	_function(self, rx->proto.state, 3);
+		_value aIndex = _pop(self);
+		_value aU8    = _pop(self);
+		_value aDict  = _pop(self);
+
+		_value cn   = _constant_inum(self, _uint, '\n');
+		_value c0   = _constant_inum(self, _int, 0);
+		_value c1   = _constant_inum(self, _int, 1);
+		_value ce   = _constant_inum(self, _long, -1);
+		_value qn   = _constant_inum(self, _uint, quantifier->n);
+		_value qm   = _constant_inum(self, _uint, quantifier->m);
+		_value ret;
+
+		_value match = _variable(self, _uint);
+		_clr(self, match);
+
+		_value u8 = _add(self, aU8, aIndex);
+
+		_do(self);
+			_make_lazy(rx, self, c0, aDict, aU8, u8, match, qn, lazy);
+			unsigned orCount = vector_count(&grp->state);
+			for( unsigned ior = 0; ior < orCount; ++ior ){	
+				unsigned stCount = vector_count(&grp->state[0]);
+				for( unsigned si = 0; si < stCount; ++si ){
+					ret = _call(self, rx->proto.state, grp->state[0][si].fn, (_value[]){aDict, aU8, aIndex}, 3);
+					_if(self, ret, _le, c0);
+						//TODO goto OR || break
+					_endif(self);
+					_store(self, aIndex, ret);
+				}
+				//TODO set nextor
+			}
+
+			_store(self, match, _add(self, match, c1));
+			u8 = _add(self, aU8, aIndex);
+			
+			_value ch = _deref(self, _utf8, u8);
+			if( rx->flags & REGEX_FLAG_DISALBLE_LINE ){
+				_if(self, ch, _eq, c0);
+			}
+			else{
+				_if_or(self, ch, _eq, c0, ch, _eq, cn);
+			}
+				_break(self);
+			_endif(self);
+		_end_while(self, match, _le, qm);
+		
+		_if(self, match, _lt, qn);
+			_return(self, _mul(self, _sub(self, u8, aU8), ce));
+		_endif(self);
+		_return(self, _sub(self, u8, aU8));
+	return _endfunction(self);
+}
+
+__private void make_reverse(regex_t*rx, state_s* state, unsigned count){
+	state[count-1].quantifier.greedy = 1;
+	while( count --> 0 ){
+		_fn lazy = state[count].quantifier.greedy ? NULL : state[count+1].fn;
+
+		switch( state[count].type ){
+			case RX_SINGLE:
+				state[count].fn = make_fn_single_cmp(rx, state[count].u, &state->quantifier, lazy);
+			break;
+
+			case RX_STRING:
+				state[count].fn = make_fn_string_cmp(rx, state[count].string, utf8_bytes_count(state[count].string));
+			break;
+
+			case RX_BACKREF:
+
+			break;
+
+			case RX_SEQUENCES:
+
+			break;
+
+			case RX_GROUP:
+
+			break;
+		}
+	}
+}
+
+__private int state_group_flags(const utf8_t** rxu8, utf8_t** name, unsigned* flags, const char** err){
+	if( **rxu8 != '?' ) return 0;
+	++(*rxu8);
+
+	dbg_info("group flags");
+
+	//check if is multi flags
+	const utf8_t* ufs = *rxu8;
+	const utf8_t* ufe = *rxu8;
+	while( *ufe && *ufe != ')' && *ufe != ':' ) ++ufe;
+	ufe = *ufe == ':' ? ufe+1 : ufs + 1;
+
+	//parsing flags;
+	const utf8_t* n = NULL;
+	unsigned l = 0;
+
+	while( ufs < ufe ){
+		switch( *ufs ){
+			case '|': *flags |= GROUP_FLAG_COUNT_RESET; break;
+			case ':': *flags &= ~GROUP_FLAG_CAPTURE; break;
+			case '\'': case '<':
+				n = ++ufs;
+				while( *ufs && *ufs != '>' && *ufs !='\'' ) ++ufs;
+				if( *ufs != '<' && *ufs != '\'' ){
+					*rxu8 = n;
+					*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
+					return -1;
+				}
+				*flags |= GROUP_FLAG_NAMED;
+				l = ufs - n;
+			break;
+
+			default: break;
+		}
+		++ufs;
+	}
+
+	if( n ) *name = utf8_dup(n, l);
+	
+	return 0;
+}
+
+__private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, const utf8_t** rxu8, const char** err){
+	s->type = RX_GROUP;
+	unsigned flags;
+	const utf8_t* u8 = *rxu8;
+	unsigned gc = *grpcount;
+	unsigned gs = gc;
+
+	s->group.id   = gc;
+	s->group.name = NULL;
+	s->group.flags= GROUP_FLAG_CAPTURE;
+
+	if( state_group_flags(rxu8, &s->group.name, &flags, err) ) return NULL;
+	if( s->group.name ) mem_gift(s->group.name, rx);
+
+	__free state_s** state = VECTOR(state_s*, 4);
+	unsigned or = 0;
+	state[0] = VECTOR(state_s, 4);
+	state_s* current;
+
+	while( *u8 ){
+		dbg_info("parsing:'%s'", (char*)u8);
+		switch( *u8 ){
+			case '.':
+				current = state_ctor(vector_push(&state[or], NULL));
+				if( !state_dot(rx, current, &u8) ) goto ONERR;
+				if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
+			break;
+
+			case '[': 
+				current = state_ctor(vector_push(&state[or], NULL));
+				if( !state_sequences(rx, current, &u8, err) ) goto ONERR;
+				if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
+			break;
+
+			case '(': 
+				current = state_ctor(vector_push(&state[or], NULL));
+				++gc;
+				if( !state_group(rx, current, &gc, &u8, err) ) goto ONERR;
+				if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
+			break;
+
+			case '|':
+				mem_gift(state[or++], state);
+				state[or] = VECTOR(state_s, 4);
+				if( s->group.flags & GROUP_FLAG_COUNT_RESET ){
+					if( gc > *grpcount ) *grpcount = gc;
+					gc = gs;
+				}
+			break;
+
+			case ')': 
+				if( gs == 0 ){
+					*err = REGEX_ERR_UNTERMINATED_GROUP;
+					goto ONERR;
+				}
+				if( !(s->group.flags & GROUP_FLAG_COUNT_RESET) ) *grpcount = gc;
+				mem_gift(state[or++], state);
+				s->group.state = state;
+				*rxu8 = u8+1;
+			return s;
+
+			case ']': *err = REGEX_ERR_UNOPENED_SEQUENCES; goto ONERR;
+			case '}': *err = REGEX_ERR_UNOPENED_QUANTIFIERS; goto ONERR;
+	
+			default :
+				current = state_ctor(vector_push(&state[or], NULL));
+				if( u8[0] == '\\' && ((u8[1] >= '0' && u8[1] <= '9') || (u8[1] == 'g')) ){
+					if( !state_backreferences(rx, current, &u8, err) ) goto ONERR;
+					if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
+				}
+				else{
+					rxch_s ch   = parse_get_ch(u8, err);
+					if( ch.nb == UINT32_MAX ) goto ONERR;
+					rxch_s next = parse_get_ch(u8+ch.nb, err);
+					if( next.code == 0 || next.code == '?' || next.code == '+' || next.code == '*' || next.code == '{' ){
+						if( !state_single(rx, current, &u8, ch) ) goto ONERR;
+						if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
+					}
+					else{
+						if( !state_string(rx, current, &u8, err) ) goto ONERR;
+					}
+				}
+			break;
+			
+		}
+	}
+
+	if( gs != 0 ){
+		*err = REGEX_ERR_UNTERMINATED_GROUP;
+		goto ONERR;
+	}
+	mem_gift(state[or++], state);
+	s->group.state = state;
+	*rxu8 = u8;
+	return s;
+
+ONERR:
+	mem_gift(state[or++], state);
+	*rxu8 = u8;
+	DELETE(state);
+	return NULL;
+}
+
+__private int parse_state(regex_t* rx, const utf8_t* regstr){
+	rx->err  = NULL;
+	rx->rx   = regstr;
+	rx->last = regstr;
+	unsigned gc = 0;
+	return state_group(rx, &rx->state, &gc, &rx->last, &rx->err) ? 0 : -1;
+}
+
+__private int make_state(regex_t* rx){
+	_ctor(&rx->jit);
+	rx->proto.state = _signature(NULL, _long, (_type[]){_dict, _putf8, _uint}, 3);
+	//TODO compilare gli stati, al contrario, rimuovere greedy dallo stato last
+	return 0;
+}
+
+__private void rx_cleanup(void* mem){
+	regex_t* rx = mem;
+	_dtor(&rx->jit);
+}
+
+regex_t* regex_build(const utf8_t* regstr, unsigned flags){
+	regex_t* rx = NEW(regex_t);
+	mem_cleanup(rx, rx_cleanup);
+	
+	rx->flags   = flags;
+	if( parse_state(rx, regstr) ) return rx;
+	if( make_state(rx) ) return rx;
+	return rx;
+}
+
+const char* regex_error(regex_t* rx){
+	return rx->err;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 __private state_s* state_group_end(state_s** state, const utf8_t** rxu8, const char** err){
 	dbg_info("group end");
 	state_s* s = vector_push(state, NULL);
@@ -688,6 +1370,7 @@ __private void dump_state(const utf8_t* rx, state_s* state){
 	}
 	puts("");
 }
+*/
 
 
 
@@ -696,54 +1379,84 @@ __private void dump_state(const utf8_t* rx, state_s* state){
 
 
 
+/*
+void test(void){
+	jit_s jit;
+	_ctor(&jit);
+	_begin(&jit);
+
+	_type sf = _signature(&jit, jit_type_int, (jit_type_t[]){jit_type_int}, 1);
+	
+	_function(&jit, sf, 1);
+		_value a = _pop(&jit);
+		_value b = _constant_inum(&jit, jit_type_int, 1);
+		_add(&jit, a, b);
+		_store(&jit, a);
+		_fn tmp = jit.fn;
+
+		_function(&jit, sf, 1);
+			_value c = _pop(&jit);
+			_value d = _constant_inum(&jit, jit_type_int, 1);
+			_add(&jit, c, d);
+			_store(&jit, c);
+			_return(&jit, c);
+		_build(&jit);
+
+		_fn bu = jit.fn;
+		jit.fn = tmp;
+
+		_call(&jit, sf, bu, (_value[]){a}, 1);
+		a = _pop(&jit);
+		
+		_return(&jit, a);
+	_build(&jit);
+	_end(&jit);
+
+	int ret = 0;
+	int arg = 8;
+	_call_jit(&jit, &ret, jit.fn, (void*[]){&arg});
+	printf("return %d\n", ret);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-__private long bt_check(dict_t* cap, unsigned id, const char* name, const utf8_t* u8, unsigned index, unsigned end){
-	generic_s* gcap = name ? dict(cap,	name) : dict(cap, id);
-	if( gcap->type != G_SUB ) return -1;
-	if( gcap->sub.size > end - index ) return -1;
-	u8 += index;
-	if( memcmp(u8, gcap->sub.start, gcap->sub.size) ) return -1;
-	return index + gcap->sub.size;
+	_dtor(&jit);
 }
 
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
 __private void make_ctor(regex_t* rx){
 	_ctor(&rx->jit);
 	_begin(&rx->jit);
@@ -770,156 +1483,9 @@ __private void make_dtor(regex_t* rx){
 	_dtor(&rx->jit);
 }
 
-__private _fn make_fn_string_cmp(regex_t* rx, const utf8_t* str, unsigned len){
-	jit_s* self = &rx->jit;
-	_begin(self);
-	
-	_function(self, rx->proto.state, 4);
-		_value aEnd   = _pop(self);
-		_value aIndex = _pop(self);
-		_value aU8    = _pop(self);
-		//unused _value aDict
-		_pop(self);
 
-		_value cstr = _constant_ptr(self, rx->type.utf8, str);
-		_value clen = _constant_inum(self, jit_type_uint, len);
-		_value c0   = _constant_inum(self, jit_type_int, 0);
-		_value ce   = _constant_inum(self, jit_type_long, -1);
 
-		_sub(self, aEnd, aIndex);
-		_if(self, _pop(self), _lt, clen);
-			_return(self, ce);
-		_endif(self);
 
-		//u8 += index
-		_add(self, aU8, aIndex);
-	
-		//memcmp(u8, str, len)
-		_call_native(self, rx->proto.memcmp, memcmp, (jit_value_t[]){_pop(self), cstr, clen}, 3);
-	
-		//return memcmp == 0 ? aIndex+len : -1
-		_if(self, _pop(self), _eq, c0);
-			_add(self, aIndex, clen);
-			_return(self, _pop(self));
-		_else(self);
-			_return(self, ce);
-
-	_build(self);
-	_end(self);
-
-	return self->fn;
-}
-
-__private _fn make_fn_state_single_cmp(regex_t* rx, ucs4_t val){
-	jit_s* self = &rx->jit;
-	_begin(self);
-	
-	_function(self, rx->proto.state, 4);
-		//unused _value aEnd   = 
-		_pop(self);
-		_value aIndex = _pop(self);
-		_value aU8    = _pop(self);
-		//unused _value aDict  = 
-		_pop(self);
-
-		_value ce = _constant_inum(self, jit_type_long, -1);
-
-		//u8 += index
-		_add(self, aU8, aIndex);
-		_value u8 = _pop(self);
-
-		// ch = utf8_to_ucs4(u8)
-		_deref(self, jit_type_uint, u8, 0);
-		_call_native(self, rx->proto.utf8ucs4, utf8_to_ucs4, (_value[]){_pop(self)}, 1);
-		_value ch = _pop(self);
-
-		_value only = _constant_inum(self, jit_type_uint, val);
-		_if(self, ch, _eq, only);
-			//index += utf8_codebpoint_nb(*u8)
-			_call_native(self, rx->proto.utf8nb, utf8_codepoint_nb, (_value[]){u8}, 1);
-			_add(self, aIndex, _pop(self));
-			_return(self, _pop(self));
-		_else(self);
-			_return(self, ce);
-	
-	_build(self);
-	_end(self);
-
-	return self->fn;
-}
-
-__private _fn make_fn_state_sequences_cmp(regex_t* rx, sequences_s* seq){
-	jit_s* self = &rx->jit;
-	_begin(self);
-	
-	_function(self, rx->proto.state, 4);
-		//unused _value aEnd   = 
-		_pop(self);
-		_value aIndex = _pop(self);
-		_value aU8    = _pop(self);
-		//unused _value aDict  = 
-		_pop(self);
-
-		_value ce = _constant_inum(self, jit_type_long, -1);
-
-		//u8 += index
-		_add(self, aU8, aIndex);
-		_value u8 = _pop(self);
-
-		// ch = utf8_to_ucs4(u8)
-		_deref(self, jit_type_uint, u8, 0);
-		_call_native(self, rx->proto.utf8ucs4, utf8_to_ucs4, (_value[]){_pop(self)}, 1);
-		_value ch = _pop(self);
-
-		foreach_vector(seq->range, i){
-			_value st = _constant_inum(self, jit_type_uint, seq->range[i].start);
-			_value en = _constant_inum(self, jit_type_uint, seq->range[i].end);
-			if( seq->reverse ) _if_not_and(self, ch, _ge, st, ch, _le, en);
-			else _if_and(self, ch, _ge, st, ch, _le, en);
-				//index += utf8_codebpoint_nb(*u8)
-				_call_native(self, rx->proto.utf8nb, utf8_codepoint_nb, (_value[]){u8}, 1);
-				_add(self, aIndex, _pop(self));
-				_return(self, _pop(self));
-			_else(self);
-		}
-		_return(self, ce);
-	
-	_build(self);
-	_end(self);
-
-	return self->fn;
-}
-
-__private _fn make_fn_state_backtrack_cmp(regex_t* rx, backtrack_s* bt){
-	jit_s* self = &rx->jit;
-	_begin(self);
-	
-	_function(self, rx->proto.state, 4);
-		_value aEnd   = _pop(self);
-		_value aIndex = _pop(self);
-		_value aU8    = _pop(self);
-		_value aDict  = _pop(self);
-
-		_value ce = _constant_inum(self, jit_type_long, -1);
-		_value bi = _constant_inum(self, jit_type_uint, bt->id);
-		_value bn = _constant_ptr(self, rx->type.str, bt->name);
-
-		//bt_check(dict, id, name, u8, index, end)
-		_call_native(self, rx->proto.btcheck, bt_check, (_value[]){aDict, bi, bn, aU8, aIndex, aEnd}, 6);
-		_value ret = _pop(self);
-		
-		_if(self, ret, _eq, ce);
-			_return(self, ce);
-		_else(self);
-			_push(self, ret);
-			_store(self, aIndex);
-			_return(self, aIndex);
-	
-	_build(self);
-	_end(self);
-
-	return self->fn;
-}
 
 __private _fn make_fn_quantifier(regex_t* rx, quantifier_s* quantifier, _fn state){
 	jit_s* self = &rx->jit;
@@ -1012,8 +1578,11 @@ __private void regex_jit(regex_t* rx, state_s* state){
 	make_ctor(rx);
 	rx_build_state(rx, state);
 }
+*/
+
 
 //todo move state inside regex, cleanup call free state and free jit ctx
+/*
 regex_t* regex(const utf8_t* rx, unsigned flags){
 	unsigned id = 1;
 	regex_t* r = NEW(regex_t);
@@ -1030,23 +1599,6 @@ regex_t* regex(const utf8_t* rx, unsigned flags){
 	mem_free(state);
 
 	return r;
-/*
-	rjit_s jit;
-	jt_ctor(&jit);
-
-	const utf8_t* literal = U8("hello");
-	jit_function_t mc = jt_make_fn_string_cmp(&jit, literal, utf8_bytes_count(literal));
-
-	const utf8_t* txt = U8("hello world hello");
-	unsigned long index = 3;
-	jit_long ret = 0;
-	_call_jit(&jit, &ret, mc, (void*[]){&txt, &index} );
-	printf("fn return:%ld\n", ret);
-
-	jt_dtor(&jit);
-	die("OK");
-	return NULL;
-*/
 }
 
 const char* regex_error(regex_t* rex){
@@ -1058,7 +1610,7 @@ void regex_error_show(regex_t* rex){
 	fprintf(stderr, "error: %s on building regex, at\n", rex->err);
 	err_showline((const char*)rex->rx, (const char*)rex->last, 0);
 }
-
+*/
 
 
 
