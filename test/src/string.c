@@ -1,6 +1,7 @@
 #include <notstd/dict.h>
 #include <notstd/regex.h>
 #include <notstd/map.h>
+#include <notstd/delay.h>
 
 //TODO not match last chars
 /*
@@ -84,11 +85,89 @@ __private void test_match(void){
 	testing_match("[a-z]+", "ciao mondo", MATCH_FULL_TEXT | MATCH_CONTINUE_AFTER, 1);
 }
 */
-int main(){
-	
-void test(void);
-test();
+struct um{
+	unsigned va;
+	unsigned nb;
+}map[16] = {
+	{0b00000000, 1},
+	{0b00000001, 1},
+	{0b00000010, 1},
+	{0b00000011, 1},
+	{0b00000100, 1},
+	{0b00000101, 1},
+	{0b00000110, 1},
+	{0b00000111, 1},
+	{0b00001000, 1},
+	{0b00001001, 1},
+	{0b00001010, 1},
+	{0b00001011, 1},
+	{0b00001100, 2},
+	{0b00001101, 2},
+	{0b00001110, 3},
+	{0b00001111, 4}
+};
 
+unsigned fast_nb(utf8_t u){
+	return ((0xE5000000 >> ((u>>4)<<1)) & 0x3)+1;
+}
+
+#define bench() time_cpu_us()
+#define TEST_BENCH (UINT32_MAX/10)
+
+void printmap(void){
+	printf("unsigned UTF8_NB_MAP[256] = {");
+	for( unsigned i = 0; i < 256; ++i ){
+		printf(" %u,", utf8_codepoint_nb(i));
+	}
+	printf("}\n");
+}
+
+int main(){
+	printmap();
+	unsigned umask = 0;
+
+	for( unsigned i = 0; i < 16; ++i ){
+		if( map[i].va > 1 ){
+			umask |= (map[i].nb) << (map[i].va<<1);
+		}
+	}
+
+	for( unsigned i = 0; i < 16; ++i ){
+		unsigned nb = fast_nb(i<<4);
+		printf("%2u| %u | %u | %s \n", i, map[i].nb, nb, map[i].nb == nb ? "true" : "fail" );
+	}
+
+	printf("mask: 0x%X\n", umask);
+
+	for( unsigned i = 0; i < 256; ++i ){
+		unsigned ounb = utf8_codepoint_nb(i);
+		unsigned nwnb = fast_nb(i);
+		if( ounb != nwnb ) die("fail on value %d, old_nb(%u) new_nb(%u)", i, ounb, nwnb);
+	}
+
+	//exit(0);
+	delay_t st = bench();
+	for( unsigned i = 0; i < TEST_BENCH; ++i ){
+		utf8_t* u8 = (utf8_t*)&i;
+		unsigned nb = utf8_codepoint_nb(*u8);
+		if( nb < 1 || nb > 4 ) die("fail on value %d, _nb(%u)", i, nb);
+		if( map[(*u8)>>4].nb != nb ) die("org fail on value %d, _nb(%u), aspected %u", i, nb, map[*u8>>4].nb);
+	}
+	delay_t en = bench();
+	printf("sta nnb: %lu\n", en-st);
+
+	st = bench();
+	for( unsigned i = 0; i < TEST_BENCH; ++i ){
+		utf8_t* u8 = (utf8_t*)&i;
+		unsigned nb = fast_nb(*u8);
+		if( nb < 1 || nb > 4 ) die("fail on value %d, _nb(%u)", i, nb);
+		if( map[(*u8)>>4].nb != nb ) die("org fail on value %d, _nb(%u), aspected %u", i, nb, map[*u8>>4].nb);
+	}
+	en = bench();
+	printf("loc fnb: %lu\n", en-st);
+
+
+	
 	//__free regex_t* r = regex(U8("ciao(mondo) (come|va)* [sqen-ces]+"), 0);
 	//regex_error_show(r);
 

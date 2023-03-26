@@ -3,6 +3,10 @@
 
 #include <notstd/core.h>
 
+#ifndef UTF8_IMPLEMENTS
+extern const unsigned UTF8_NB_MAP[256];
+#endif
+
 #define U8_CH_MAX 5
 
 #define U8(S) (const utf8_t*)(S)
@@ -73,8 +77,15 @@ typedef enum {
 	UTF8_GB_OTHER
 }utf8gbProperty_e;
 
+UNSAFE_BEGIN("-Wunused-function");
+
+__private unsigned utf8_codepoint_nb(utf8_t u){
+	return UTF8_NB_MAP[u];
+}
+
+UNSAFE_END;
+
 size_t utf8_bytes_count(const utf8_t* u);
-unsigned utf8_codepoint_nb(utf8_t u);
 const utf8_t* utf8_codepoint_next(const utf8_t* u);
 const utf8_t* utf8_codepoint_prev(const utf8_t* u, const utf8_t* start);
 size_t utf8_codepoint_count(const utf8_t* u);

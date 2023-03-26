@@ -1,18 +1,31 @@
-#include <notstd/utf8.h>
 #include <notstd/str.h>
 #include "utf8_property.h"
+
+const unsigned UTF8_NB_MAP[256] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+
+#define UTF8_IMPLEMENTS 1
+#include <notstd/utf8.h>
 
 size_t utf8_bytes_count(const utf8_t* u){
 	return strlen((char*)u);
 }
 
-unsigned utf8_codepoint_nb(utf8_t u){
+/* low mem version
+ 
+#define UTF8_CODEPOINT_NB(U) (((0xE5000000 >> (((utf8_t)(U)>>4)<<1)) & 0x03)+1)
+
+__const unsigned utf8_codepoint_nb(utf8_t u){
+	return UTF8_CODEPOINT_NB(u);
+}
+
+__const unsigned utf8_codepoint_nb(utf8_t u){
 	u >>= 4;
 	if( u == 0xF ) return 4;
 	if( u == 0xE ) return 3;
 	if( (u >> 1) == 6 ) return 2;
 	return 1;
 }
+*/
 
 const utf8_t* utf8_codepoint_next(const utf8_t* u){
 	return *u ? u + utf8_codepoint_nb(*u) : u;

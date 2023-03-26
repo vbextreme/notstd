@@ -827,19 +827,24 @@ __private _fn make_fn_group_cmp(regex_t* rx, group_s* grp, quantifier_s* quantif
 
 		_do(self);
 			_make_lazy(rx, self, c0, aDict, aU8, u8, match, qn, lazy);
+			_lbl nextor;
+			_lbl onmatch = _lbl_undef;
 			unsigned orCount = vector_count(&grp->state);
-			for( unsigned ior = 0; ior < orCount; ++ior ){	
+			for( unsigned ior = 0; ior < orCount; ++ior ){
+				nextor = _lbl_undef;
 				unsigned stCount = vector_count(&grp->state[0]);
 				for( unsigned si = 0; si < stCount; ++si ){
 					ret = _call(self, rx->proto.state, grp->state[0][si].fn, (_value[]){aDict, aU8, aIndex}, 3);
 					_if(self, ret, _le, c0);
-						//TODO goto OR || break
+						_goto(self, &nextor);
 					_endif(self);
 					_store(self, aIndex, ret);
 				}
-				//TODO set nextor
+				_goto(self, &onmatch);
+				_label(self, &nextor);
 			}
-
+			_break(self);
+			_label(self, &onmatch);
 			_store(self, match, _add(self, match, c1));
 			u8 = _add(self, aU8, aIndex);
 			
@@ -876,15 +881,18 @@ __private void make_reverse(regex_t*rx, state_s* state, unsigned count){
 			break;
 
 			case RX_BACKREF:
-
+				state[count].fn = make_fn_backref_cmp(rx, &state[count].backref, &state[count].quantifier, lazy);
 			break;
 
 			case RX_SEQUENCES:
-
+				state[count].fn = make_fn_sequences_cmp(rx, &state[count].seq, &state[count].quantifier, lazy);
 			break;
 
 			case RX_GROUP:
-
+				foreach_vector(state[count].group.state, ior){
+					make_reverse(rx, state[count].group.state[ior], vector_count(&state[count].group.state[ior]));
+				}
+				state[count].fn = make_fn_group_cmp(rx, &state[count].group, &state[count].quantifier, lazy);
 			break;
 		}
 	}
@@ -1046,7 +1054,9 @@ __private int parse_state(regex_t* rx, const utf8_t* regstr){
 __private int make_state(regex_t* rx){
 	_ctor(&rx->jit);
 	rx->proto.state = _signature(NULL, _long, (_type[]){_dict, _putf8, _uint}, 3);
-	//TODO compilare gli stati, al contrario, rimuovere greedy dallo stato last
+	rx->proto.brnamed =  _signature(NULL, _long, (_type[]){ _pvoid, _dict, _putf8, _uint}, 4);
+	rx->proto.brindex =  _signature(NULL, _long, (_type[]){ _uint, _dict, _putf8, _uint}, 4);
+	make_reverse(rx, &rx->state, 1);
 	return 0;
 }
 
@@ -1061,7 +1071,7 @@ regex_t* regex_build(const utf8_t* regstr, unsigned flags){
 	
 	rx->flags   = flags;
 	if( parse_state(rx, regstr) ) return rx;
-	if( make_state(rx) ) return rx;
+	make_state(rx);
 	return rx;
 }
 
