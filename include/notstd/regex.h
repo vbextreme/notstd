@@ -17,12 +17,13 @@
 #define REGEX_ERR_INVALID_QUANTIFIER      "invalid quantifier"
 #define REGEX_ERR_ASPECTED_SEQUENCES      "aspected sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP_NAME "unterminated group name"
+#define REGEX_ERR_NUMERICAL_OUT_OF_RANGE  strerror(ERANGE)
 
 #define REGEX_FLAG_DISALBLE_LINE 0x01
 
 typedef struct regex regex_t;
 
-regex_t* regex(const utf8_t* rx, unsigned flags);
+regex_t* regex_build(const utf8_t* regstr, unsigned flags);
 const char* regex_error(regex_t* rex);
 void regex_error_show(regex_t* rex);
 

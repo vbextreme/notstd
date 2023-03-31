@@ -170,9 +170,12 @@ __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 			case 't': ch.code = str_to_ucs4("\t"); ch.nb = 2; return ch;
 			case 'u':
 			case 'U':{
+				dbg_info("escaping unicode");
+				++u8;
+				if( *u8 == '+' ) ++u8;
 				int e;
 				const utf8_t* next;
-				ch.code = utf8_toul(u8+1, &next, 16, &e);
+				ch.code = utf8_toul(u8, &next, 16, &e);
 				if( e ){
 					*err = REGEX_ERR_INVALID_UTF_ESCAPE;
 					ch.code = 0;
@@ -320,7 +323,14 @@ __private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, co
 	s->type = RX_STRING;
 
 	while( *u8 && *u8 != '(' && *u8 != ')' && *u8 != '[' && *u8 != ']' && *u8 != '|' ){
+		if( u8[0] == '\\' && (u8[1] == 'g' || (u8[1] >= '0' && u8[1] <= '9')) ) break;
+
 		rxch_s ch = parse_get_ch(u8, err);
+		if( ch.nb == UINT32_MAX ){
+			mem_free(str);
+			*rxu8 = u8;
+			return NULL;
+		}
 		u8 += ch.nb;
 	
 		if( *u8 == '?' || *u8 == '+' || *u8 == '*' || *u8 == '{' ) break;
@@ -329,13 +339,6 @@ __private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, co
 			size *= 2;
 			str = RESIZE(utf8_t, str, size);
 		}
-
-		if( ch.nb == UINT32_MAX ){
-			*rxu8 = u8;
-			mem_free(str);
-			return NULL;
-		}
-		
 		len += ucs4_to_utf8(ch.code, &str[len]);
 	}
 
@@ -542,6 +545,7 @@ __private void seq_ctor(sequences_s* seq){
 }
 
 __private void seq_add(sequences_s* seq, ucs4_t st, ucs4_t en){
+	dbg_info("seq add %u-%u", st, en);
 	if( st < 256 ){
 		if( en > 255 ){
 			range_s* r = vector_push(&seq->range, NULL);
@@ -576,6 +580,7 @@ __private void seq_merge(sequences_s* seq, unsigned disableline){
 		seq->ascii[i] &= ~( 1 << ('n'>>3));
 	}
 
+	if( !vector_count(&seq->range) ) return;
 	vector_qsort(&seq->range, range_cmp);
 	unsigned i = 0;
 	while( i < vector_count(&seq->range) - 1 ){
@@ -660,7 +665,7 @@ __private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8,
 		return NULL;
 	}
 	
-	if( !vector_count(&s->seq.range) ){
+	if( !vector_count(&s->seq.range) && !s->seq.asciiset ){
 		mem_free(s->seq.range);
 		*err = REGEX_ERR_ASPECTED_SEQUENCES;
 		return NULL;
@@ -867,6 +872,7 @@ __private _fn make_fn_group_cmp(regex_t* rx, group_s* grp, quantifier_s* quantif
 }
 
 __private void make_reverse(regex_t*rx, state_s* state, unsigned count){
+	iassert(count);
 	state[count-1].quantifier.greedy = 1;
 	while( count --> 0 ){
 		_fn lazy = state[count].quantifier.greedy ? NULL : state[count+1].fn;
@@ -922,7 +928,7 @@ __private int state_group_flags(const utf8_t** rxu8, utf8_t** name, unsigned* fl
 				n = ++ufs;
 				while( *ufs && *ufs != '>' && *ufs !='\'' ) ++ufs;
 				if( *ufs != '<' && *ufs != '\'' ){
-					*rxu8 = n;
+					*rxu8 = n-1;
 					*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
 					return -1;
 				}
@@ -946,6 +952,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	const utf8_t* u8 = *rxu8;
 	unsigned gc = *grpcount;
 	unsigned gs = gc;
+	const utf8_t* stgr = u8;
 
 	s->group.id   = gc;
 	s->group.name = NULL;
@@ -977,6 +984,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 			case '(': 
 				current = state_ctor(vector_push(&state[or], NULL));
 				++gc;
+				++u8;
 				if( !state_group(rx, current, &gc, &u8, err) ) goto ONERR;
 				if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
 			break;
@@ -988,11 +996,12 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 					if( gc > *grpcount ) *grpcount = gc;
 					gc = gs;
 				}
+				++u8;
 			break;
 
 			case ')': 
 				if( gs == 0 ){
-					*err = REGEX_ERR_UNTERMINATED_GROUP;
+					*err = REGEX_ERR_UNOPENED_GROUP;
 					goto ONERR;
 				}
 				if( !(s->group.flags & GROUP_FLAG_COUNT_RESET) ) *grpcount = gc;
@@ -1007,6 +1016,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 			default :
 				current = state_ctor(vector_push(&state[or], NULL));
 				if( u8[0] == '\\' && ((u8[1] >= '0' && u8[1] <= '9') || (u8[1] == 'g')) ){
+					dbg_info("escape is a back references");
 					if( !state_backreferences(rx, current, &u8, err) ) goto ONERR;
 					if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
 				}
@@ -1029,6 +1039,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 
 	if( gs != 0 ){
 		*err = REGEX_ERR_UNTERMINATED_GROUP;
+		u8 = stgr-1;
 		goto ONERR;
 	}
 	mem_gift(state[or++], state);
@@ -1079,6 +1090,11 @@ const char* regex_error(regex_t* rx){
 	return rx->err;
 }
 
+void regex_error_show(regex_t* rx){
+	if( !rx->err ) return;
+	fprintf(stderr, "error: %s on building regex, at\n", rx->err);
+	err_showline((const char*)rx->rx, (const char*)rx->last, 0);
+}
 
 
 
