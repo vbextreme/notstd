@@ -266,6 +266,9 @@ __private int parse_quantifier(quantifier_s* q, const utf8_t** rxu8, const char*
 
 state_s* state_ctor(state_s* s){
 	s->fn = NULL;
+	s->quantifier.n = 1;
+	s->quantifier.m = 1;
+	s->quantifier.greedy = 1;
 	return s;
 }
 
@@ -961,9 +964,11 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	if( state_group_flags(rxu8, &s->group.name, &flags, err) ) return NULL;
 	if( s->group.name ) mem_gift(s->group.name, rx);
 
-	__free state_s** state = VECTOR(state_s*, 4);
+	state_s** state = VECTOR(state_s*, 4);
 	unsigned or = 0;
-	state[0] = VECTOR(state_s, 4);
+	state_s* tmp = VECTOR(state_s, 4);
+	vector_push(&state, &tmp);
+	mem_gift(state[or], state);
 	state_s* current;
 
 	while( *u8 ){
@@ -990,8 +995,10 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 			break;
 
 			case '|':
-				mem_gift(state[or++], state);
-				state[or] = VECTOR(state_s, 4);
+				++or;
+				tmp = VECTOR(state_s, 4);
+				vector_push(&state, &tmp);
+				mem_gift(state[or], state);
 				if( s->group.flags & GROUP_FLAG_COUNT_RESET ){
 					if( gc > *grpcount ) *grpcount = gc;
 					gc = gs;
@@ -1005,7 +1012,6 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 					goto ONERR;
 				}
 				if( !(s->group.flags & GROUP_FLAG_COUNT_RESET) ) *grpcount = gc;
-				mem_gift(state[or++], state);
 				s->group.state = state;
 				*rxu8 = u8+1;
 			return s;
@@ -1042,13 +1048,11 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 		u8 = stgr-1;
 		goto ONERR;
 	}
-	mem_gift(state[or++], state);
 	s->group.state = state;
 	*rxu8 = u8;
 	return s;
 
 ONERR:
-	mem_gift(state[or++], state);
 	*rxu8 = u8;
 	DELETE(state);
 	return NULL;
@@ -1059,6 +1063,7 @@ __private int parse_state(regex_t* rx, const utf8_t* regstr){
 	rx->rx   = regstr;
 	rx->last = regstr;
 	unsigned gc = 0;
+	state_ctor(&rx->state);
 	return state_group(rx, &rx->state, &gc, &rx->last, &rx->err) ? 0 : -1;
 }
 
@@ -1076,12 +1081,97 @@ __private void rx_cleanup(void* mem){
 	_dtor(&rx->jit);
 }
 
+__private void dump_ch(ucs4_t ch){
+	switch( ch ){
+		case '\t': printf("\\t"); break;
+		case '\n': printf("\\n"); break;
+		case  0 ... 8: 
+		case 11 ... 31:
+		case 127 ... UINT32_MAX:
+			printf("\\u%u", ch); 
+		break;
+		default: printf("%c", ch); break;
+	}
+}
+
+__private int check_ascii(sequences_s* seq, ucs4_t ch){
+	unsigned i = ch & 7;
+	return seq->ascii[i] & ( 1 << (ch>>3)) ? 1 : 0;
+}
+
+__private void dump_seq(sequences_s* seq){
+	printf("[");
+	unsigned a = 0;
+	while( a < 256 ){
+		while( a < 256 && !check_ascii(seq, a) ) ++a;
+		if( a >= 256 ) break;
+		unsigned st = a++;
+		while( a < 256 && check_ascii(seq, a) ) ++a;
+		unsigned en = a-1;
+		dbg_info("range %u-%u", st, en);
+		dump_ch(st);
+		if( st != en ){
+			putchar('-');
+			dump_ch(en);
+		}
+	}
+	
+	iassert(seq->range);
+	foreach_vector(seq->range, i){
+		dump_ch(seq->range[i].start);
+		if( seq->range[i].end != seq->range[i].start ){
+			putchar('-');
+			dump_ch(seq->range[i].end);
+		}
+	}
+	printf("]");
+}
+
+__private void dump_backref(backref_s* br){
+	if( br->name ){
+		printf("\\g{%s}", br->name);
+	}
+	else{
+		printf("\\%u", br->id);
+	}
+}
+
+//#include <notstd/delay.h>
+
+__private void state_dump(state_s* state, unsigned count){
+	iassert(count);
+	for( unsigned i = 0 ; i < count; ++i ){
+		switch( state[i].type ){
+			case RX_SINGLE   : dump_ch(state[i].u); break;
+			case RX_STRING   : printf("%s", state[i].string); break;
+			case RX_BACKREF  : dump_backref(&state[i].backref); break;
+			case RX_SEQUENCES: dump_seq(&state[i].seq); break;
+			case RX_GROUP    :
+				printf("(");
+				unsigned nor = vector_count(&state[i].group.state);
+				foreach_vector(state[i].group.state, ior){
+					state_dump(state[i].group.state[ior], vector_count(&state[i].group.state[ior]));
+					if( ior < nor-1 ) printf("|");
+				}
+				printf(")");
+			break;
+		}
+		printf("{%u,%u}", state[i].quantifier.n, state[i].quantifier.m);
+		if( !state[i].quantifier.greedy ) putchar('?');
+	}
+}
+
+__private void dump_state(regex_t* rx){
+	state_dump(&rx->state, 1);
+	putchar('\n');
+}
+
 regex_t* regex_build(const utf8_t* regstr, unsigned flags){
 	regex_t* rx = NEW(regex_t);
 	mem_cleanup(rx, rx_cleanup);
-	
-	rx->flags   = flags;
+	rx->flags = flags;
 	if( parse_state(rx, regstr) ) return rx;
+	dump_state(rx);
 	make_state(rx);
 	return rx;
 }
@@ -1096,7 +1186,20 @@ void regex_error_show(regex_t* rx){
 	err_showline((const char*)rx->rx, (const char*)rx->last, 0);
 }
 
-
+dict_t* match_at(regex_t* rx, const utf8_t* str){
+	if( rx->err ) return NULL;
+	rx->last = str;
+	long res = -1;
+	uint32_t at = 0;
+	dict_t* cap = dict_new();
+	_call_jit(&rx->jit, &res, rx->state.fn, (void*[]){&cap, &str, &at});
+	if( res < 1 ){
+		dbg_info("no match return: %ld", res);
+		mem_free(cap);
+		return NULL;
+	}
+	return cap;
+}
 
 
 

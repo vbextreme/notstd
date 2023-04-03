@@ -40,6 +40,8 @@ __private void test_build(void){
 	testing_build("ciao(?')", REGEX_ERR_UNTERMINATED_GROUP_NAME, 0);
 	
 }
+
+
 /*
 __private void show_capture(const utf8_t* rx, const utf8_t* txt, dict_t* cap){
 	if( rx ) printf("/%s/\n", rx);
@@ -83,6 +85,16 @@ __private void test_match(void){
 }
 */
 int main(){
+	const utf8_t* rx = U8("ciao[ \\t](mondo)[ \\t]!?, (bye|good bye).*");
+	__free regex_t* r = regex_build(rx, 0);
+	if( regex_error(r) ){
+		regex_error_show(r);
+		return 1;
+	}
+
+	dict_t* cap = match_at(r, U8("ciao"));
+	if( cap ) mem_free(cap);
+	return 0;
 	test_build();
 	//test_match();
 	return 0;
