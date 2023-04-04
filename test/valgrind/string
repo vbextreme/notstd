@@ -4,5 +4,5 @@ meson configure -Dut='string' -Dutvalue='0x0'
 ninja clean
 ninja 
 
-DEBUGINFOD_URLS=/etc/profile.d/debuginfod.sh valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no\
+valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no\
    	./notstd

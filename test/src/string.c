@@ -85,6 +85,7 @@ __private void test_match(void){
 }
 */
 int main(){
+	/*	
 	const utf8_t* rx = U8("ciao[ \\t](mondo)[ \\t]!?, (bye|good bye).*");
 	__free regex_t* r = regex_build(rx, 0);
 	if( regex_error(r) ){
@@ -94,6 +95,25 @@ int main(){
 
 	dict_t* cap = match_at(r, U8("ciao"));
 	if( cap ) mem_free(cap);
+	*/
+
+	const utf8_t* rx = U8("ciao");
+	regex_t* r = regex_build(rx, 0);
+	if( regex_error(r) ){
+		regex_error_show(r);
+		return 1;
+	}
+
+	dict_t* cap = match_at(r, U8("ciao"), NULL);
+	if( cap ){
+		generic_s* m;
+		if( (m=dict(cap, 0))->type == G_SUB ){
+			printf("match[0]: %.*s\n", m->sub.size, (char*)m->sub.start);
+		}
+		mem_free(cap);
+	}
+	mem_free(r);
+
 	return 0;
 	test_build();
 	//test_match();

@@ -26,8 +26,8 @@ typedef struct regex regex_t;
 regex_t* regex_build(const utf8_t* regstr, unsigned flags);
 const char* regex_error(regex_t* rex);
 void regex_error_show(regex_t* rex);
+dict_t* match_at(regex_t* rx, const utf8_t* str, const utf8_t** next);
 
-dict_t* match_at(regex_t* rx, const utf8_t* str);
 
 /*
 #define FSM_STATE_FLAG_NGREEDY 0x01
