@@ -773,7 +773,6 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	unsigned or = 0;
 	state_s* tmp = VECTOR(state_s, 4);
 	vector_push(&state, &tmp);
-	mem_gift(state[or], rx);
 	state_s* current;
 
 	while( *u8 ){
@@ -800,10 +799,10 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 			break;
 
 			case '|':
+				mem_gift(state[or], rx);
 				++or;
 				tmp = VECTOR(state_s, 4);
 				vector_push(&state, &tmp);
-				mem_gift(state[or], rx);
 				if( s->group.flags & GROUP_FLAG_COUNT_RESET ){
 					if( gc > *grpcount ) *grpcount = gc;
 					gc = gs;
@@ -819,6 +818,8 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 				if( !(s->group.flags & GROUP_FLAG_COUNT_RESET) ) *grpcount = gc;
 				s->group.state = state;
 				*rxu8 = u8+1;
+				mem_gift(state[or], rx);
+				mem_gift(state, rx);
 			return s;
 
 			case ']': *err = REGEX_ERR_UNOPENED_SEQUENCES; goto ONERR;
@@ -855,6 +856,8 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	}
 	s->group.state = state;
 	*rxu8 = u8;
+	mem_gift(state[or], rx);
+	mem_gift(state, rx);
 	return s;
 
 ONERR:

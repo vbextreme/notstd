@@ -2,6 +2,7 @@
 #include <notstd/fzs.h>
 #include <notstd/vector.h>
 #include <notstd/delay.h>
+#include <notstd/str.h>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -88,28 +89,14 @@ void uc_fzs(void){
 	}
 }
 
-const char* str_tok(const char** str, const char* del, __out unsigned* len){
-	if( !**str ) return NULL;
-	const char* begin = *str;
-	const char* end = strstr(begin, del);
-	if( !end ){
-		*len = strlen(begin);
-		*str = begin + *len;
-	}
-	else{
-		*len = end - begin;
-		*str = end + strlen(del);
-	}
-	return begin;
-}
-
 __private char** allcmd(void){
 	char** ret = VECTOR(char*, 128);
 	const char* PATH = getenv("PATH");
 	if( !PATH ) die("need enviroment PATH");
 	const char* path;
 	unsigned len;
-	while( (path=str_tok(&PATH, ":", &len)) ){
+	unsigned next = 0;
+	while( (path=str_tok(PATH, ":", 0, &len, &next)) ){
 		if( !len && len >= PATH_MAX - 1 ) continue;
 		char norm[PATH_MAX];
 		memcpy(norm, path, len);

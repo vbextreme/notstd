@@ -23,6 +23,8 @@ dict_t* dict_new(void){
 	dict_t* d = NEW(dict_t);
 	d->itree = rbtree_new(icmp);
 	d->stree = rbtree_new(scmp);
+	mem_gift(d->itree, d);
+	mem_gift(d->stree, d);
 	return d;
 }
 

@@ -11,7 +11,7 @@ __private int pair(void* KV, __unused void* arg){
 }
 
 void uc_dict(void){
-	dict_t* d = dict_new();
+	__free dict_t* d = dict_new();
 	
 	*dict(d, "key") = GI("value");
 	*dict(d, "key2") = GI("value2");

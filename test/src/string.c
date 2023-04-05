@@ -85,20 +85,8 @@ __private void test_match(void){
 }
 */
 int main(){
-	/*	
-	const utf8_t* rx = U8("ciao[ \\t](mondo)[ \\t]!?, (bye|good bye).*");
-	__free regex_t* r = regex_build(rx, 0);
-	if( regex_error(r) ){
-		regex_error_show(r);
-		return 1;
-	}
-
-	dict_t* cap = match_at(r, U8("ciao"));
-	if( cap ) mem_free(cap);
-	*/
-
-	const utf8_t* rx = U8("(?'fn'_[a-z]+)");
-	regex_t* r = regex(rx, 0);
+	const utf8_t* rx = U8("void (?'fn'_[a-z]+)");
+	__free regex_t* r = regex(rx, 0);
 	if( regex_error(r) ){
 		regex_error_show(r);
 		return 1;
@@ -112,10 +100,7 @@ int main(){
 			g_print(kv->key);
 			printf("](%u): %.*s\n", kv->value.sub.size, kv->value.sub.size, (char*)kv->value.sub.start);
 		}
-	}	
-
-	
-	mem_free(r);
+	}
 
 	return 0;
 	test_build();

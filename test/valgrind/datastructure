@@ -1,8 +1,8 @@
 #!/bin/bash
 cd build
-meson configure -Dut='datastructure' -Dutvalue='0x1000'
+meson configure -Dut='datastructure' -Dutvalue='0x0400'
 ninja clean
 ninja 
 
-DEBUGINFOD_URLS=/etc/profile.d/debuginfod.sh valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no\
+valgrind --undef-value-errors=no --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=no --trace-syscalls=no\
    	./notstd
