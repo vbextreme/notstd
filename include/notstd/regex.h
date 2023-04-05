@@ -10,7 +10,7 @@
 #define REGEX_ERR_UNOPENED_SEQUENCES      "unopened sequences"
 #define REGEX_ERR_UNOPENED_GROUP          "unopened group"
 #define REGEX_ERR_UNOPENED_QUANTIFIERS    "unopened quantifiers"
-#define REGEX_ERR_UNOPENED_BACKREF_NAME   "unopened backreferences name"
+#define REGEX_ERR_UNOPENED_BACKREF_NAME   "unopened back references name"
 #define REGEX_ERR_UNTERMINATED_SEQUENCES  "untermited sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP      "untermited group"
 #define REGEX_ERR_UNTERMINATED_QUANTIFIER "unterminated quantifiers"
@@ -18,16 +18,16 @@
 #define REGEX_ERR_ASPECTED_SEQUENCES      "aspected sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP_NAME "unterminated group name"
 #define REGEX_ERR_NUMERICAL_OUT_OF_RANGE  strerror(ERANGE)
-#define REGEX_ERR_NOTSTARTED_WITH_SLASH   "need start regex with /"
+#define REGEX_ERR_CANT_START_WITH_BACKREF "regex can't start with back references"
 #define REGEX_FLAG_DISALBLE_LINE 0x01
 
 typedef struct regex regex_t;
 
-regex_t* regex_build(const utf8_t* regstr, unsigned flags);
+regex_t* regex(const utf8_t* regstr, unsigned flags);
 const char* regex_error(regex_t* rex);
 void regex_error_show(regex_t* rex);
 dict_t* match_at(regex_t* rx, const utf8_t* str, const utf8_t** next);
-
+dict_t* match(regex_t* rx, const utf8_t* str, const utf8_t** next);
 
 /*
 #define FSM_STATE_FLAG_NGREEDY 0x01

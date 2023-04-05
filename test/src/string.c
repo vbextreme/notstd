@@ -5,7 +5,7 @@
 
 __private void testing_build(const char* rx, const char* err, int show){
 	dbg_warning("try /%s/", rx);
-	__free regex_t* rex = regex_build(U8(rx), 0);
+	__free regex_t* rex = regex(U8(rx), 0);
 	if( regex_error(rex) != err ) die("regex return '%s' but aspected '%s' %d", regex_error(rex), err, errno);
 	if( show ){
 		regex_error_show(rex);
@@ -97,21 +97,24 @@ int main(){
 	if( cap ) mem_free(cap);
 	*/
 
-	const utf8_t* rx = U8("[A-Z]+");
-	regex_t* r = regex_build(rx, 0);
+	const utf8_t* rx = U8("(_[a-z]+)");
+	regex_t* r = regex(rx, 0);
 	if( regex_error(r) ){
 		regex_error_show(r);
 		return 1;
 	}
 
-	dict_t* cap = match_at(r, U8("CIao"), NULL);
-	if( cap ){
-		generic_s* m;
-		if( (m=dict(cap, 0))->type == G_SUB ){
-			printf("match[0](%u): %.*s\n", m->sub.size, m->sub.size, (char*)m->sub.start);
+	__free dict_t* cap = match(r, U8("void _boo() {}"), NULL);
+	dictPair_s* kv;
+	foreach(dict, cap, kv, 0, dict_count(cap)){
+		if( kv->value.type == G_SUB ){
+			printf("match[");
+			g_print(kv->key);
+			printf("](%u): %.*s\n", kv->value.sub.size, kv->value.sub.size, (char*)kv->value.sub.start);
 		}
-		mem_free(cap);
-	}
+	}	
+
+	
 	mem_free(r);
 
 	return 0;

@@ -149,6 +149,7 @@ typedef struct rxch{
 
 struct regex{
 	state_s       state;
+	utf8_t*       ff;
 	const utf8_t* rx;
 	const char*   err;
 	const utf8_t* last;
@@ -685,7 +686,7 @@ __private const utf8_t* group_state_walk(state_s* s, const unsigned count, dict_
 __private const utf8_t* group_state_or(state_s** s, const unsigned count, dict_t* cap, const utf8_t* txt){
 	const utf8_t* begin = txt;
 	for( unsigned or = 0; or < count; ++or ){
-		txt = group_state_walk(s[or], vector_count(&s), cap, begin);
+		txt = group_state_walk(s[or], vector_count(&s[or]), cap, begin);
 		if( txt ) return txt;
 	}
 	return NULL;
@@ -965,6 +966,13 @@ __private void state_dump(state_s* state, unsigned count){
 __private void dump_state(regex_t* rx){
 	state_dump(&rx->state, 1);
 	putchar('\n');
+	printf("fast find: '");
+	char* s = (char*)rx->ff;
+	while( *s ){
+		dump_ch(*s);
+		++s;
+	}
+	printf("'\n");
 }
 
 __private int parse_state(regex_t* rx, const utf8_t* regstr){
@@ -990,11 +998,65 @@ __private void set_lazy(state_s* s){
 	}
 }
 
-regex_t* regex_build(const utf8_t* regstr, unsigned flags){
+__private void vff_add(utf8_t** vff, utf8_t u){
+	foreach_vector(*vff, i){
+		if( (*vff)[i] == u ) return;
+	}
+	vector_push(vff, &u);
+}
+
+__private const char* parse_fast_find(utf8_t** vff, state_s* s){
+	switch( s->type ){
+		case RX_BACKREF: return REGEX_ERR_CANT_START_WITH_BACKREF;
+
+		case RX_SINGLE:{
+			utf8_t u[5];
+			ucs4_to_utf8(s->u, u);
+			vff_add(vff, u[0]);
+			break;
+		}
+
+		case RX_STRING:
+			vff_add(vff, s->str.str[0]);
+		break;
+					   
+		case RX_SEQUENCES: 
+			if( s->seq.asciiset ){
+				for( unsigned i = 1; i < SEQ_ASCII_MAX; ++i ){
+					if( s->seq.ascii[SEQ_ASCII_INDEX(i)] & SEQ_ASCII_BIT(i) ){
+						vff_add(vff, i);
+					}
+				}
+			}
+			foreach_vector(s->seq.range, i){
+				for( unsigned j = s->seq.range[i].start; j <= s->seq.range[i].end; ++j ){
+					utf8_t u[5];
+					ucs4_to_utf8(s->u, u);
+					vff_add(vff, j);
+				}
+			}
+		break;
+		
+		case RX_GROUP:
+			foreach_vector(s->group.state, ior){
+				const char* res = parse_fast_find(vff, &s->group.state[ior][0]);
+				if( res ) return res;
+			}
+		break;
+	}
+
+	return NULL;
+}
+
+regex_t* regex(const utf8_t* regstr, unsigned flags){
 	regex_t* rx = NEW(regex_t);
 	rx->flags = flags;
 	if( parse_state(rx, regstr) ) return rx;
 	set_lazy(&rx->state);
+	rx->ff  = VECTOR(utf8_t, 8);
+	rx->err = parse_fast_find(&rx->ff, &rx->state);
+	vff_add(&rx->ff, 0);
+	mem_gift(rx->ff, rx);
 	dump_state(rx);
 	return rx;
 }
@@ -1016,4 +1078,23 @@ dict_t* match_at(regex_t* rx, const utf8_t* str, const utf8_t** next){
 	if( next ) *next = res;
 	return cap;
 }
+
+dict_t* match(regex_t* rx, const utf8_t* str, const utf8_t** next){
+	if( rx->err ) return NULL;
+
+	const utf8_t* f = str;
+	dict_t* cap = dict_new();
+	const utf8_t* res;
+
+	while( *(f = utf8_anyof(f, rx->ff)) && !(res=rx->state.fn(&rx->state, cap, f)) );
+	
+	if( next ) *next = res;	
+	return cap;
+}
+
+
+
+
+
+
 

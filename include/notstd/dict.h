@@ -9,15 +9,15 @@ typedef struct dictPair{
 	generic_s value;
 }dictPair_s;
 
-typedef struct gpair{
-	generic_s key;
-	generic_s* value;
-}gpair_s;
+//typedef struct gpair{
+//	generic_s key;
+//	generic_s* value;
+//}gpair_s;
 
 typedef struct dict dict_t;
 typedef struct dictit dict_i;
 
-typedef int(*dictMap_f)(gpair_s pair, void* arg);
+typedef int(*dictMap_f)(dictPair_s pair, void* arg);
 
 dict_t* dict_new(void);
 generic_s* dicti(dict_t* d, long key);

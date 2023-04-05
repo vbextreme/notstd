@@ -558,7 +558,10 @@ utf8_t* utf8_dup(const utf8_t* src, unsigned len){
 	return (utf8_t*)str_dup((const char*)src, len);
 }
 
-
+const utf8_t* utf8_anyof(const utf8_t* str, const utf8_t* any){
+	size_t ret = strcspn((const char*)str, (const char*)any); 
+	return str+ret;
+}
 
 
 
