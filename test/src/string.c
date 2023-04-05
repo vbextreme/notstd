@@ -97,7 +97,7 @@ int main(){
 	if( cap ) mem_free(cap);
 	*/
 
-	const utf8_t* rx = U8("(_[a-z]+)");
+	const utf8_t* rx = U8("(?'fn'_[a-z]+)");
 	regex_t* r = regex(rx, 0);
 	if( regex_error(r) ){
 		regex_error_show(r);
