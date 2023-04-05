@@ -93,11 +93,13 @@ typedef struct range{
 	ucs4_t end;
 }range_s;
 
-#define SEQ_ASCII_INDEX(U) ((U)&3)
-#define SEQ_ASCII_BIT(U)   (1<<((U)>>2))
+#define SEQ_ASCII_LUT      4
+#define SEQ_ASCII_MAX      128
+#define SEQ_ASCII_INDEX(U) ((U)>>5)
+#define SEQ_ASCII_BIT(U)   (1<<((U)&31))
 
 typedef struct sequences{
-	uint32_t ascii[4];
+	uint32_t ascii[SEQ_ASCII_LUT];
 	range_s* range;
 	unsigned reverse;
 	unsigned asciiset;
@@ -346,7 +348,7 @@ __private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, co
 __private const utf8_t* single_cmp_fn(state_s* self, dict_t* cap, const utf8_t* txt){
 	unsigned match = 0;
 	do{
-		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
+		if( self->lazy && match >= self->quantifier.n && self->lazy->fn(self->lazy, cap, txt)) return txt;
 		ucs4_t u = utf8_to_ucs4(txt);
 		if( u != self->u ) break;
 		++match;
@@ -380,7 +382,7 @@ __private const utf8_t* seq_ascii_cmp_fn(state_s* self, dict_t* cap, const utf8_
 	unsigned match = 0;
 	do{
 		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
-		if( *txt > 127 ) break;
+		if( *txt >= SEQ_ASCII_MAX ) break;
 		if( !(self->seq.ascii[SEQ_ASCII_INDEX(*txt)] & SEQ_ASCII_BIT(*txt)) ) break;
 		++match;
 		++txt;
@@ -394,6 +396,7 @@ __private const utf8_t* seq_range_cmp_fn(state_s* self, dict_t* cap, const utf8_
 	do{
 		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
 		ucs4_t u = utf8_to_ucs4(txt);
+		if( !u ) break;
 		unsigned in = 0;
 		for( unsigned i = 0; i < count; ++i ){
 			if( u >= self->seq.range[i].start && u <= self->seq.range[i].end ){
@@ -414,7 +417,7 @@ __private const utf8_t* seq_ascii_range_cmp_fn(state_s* self, dict_t* cap, const
 	do{
 		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
 		ucs4_t u = utf8_to_ucs4(txt);
-		if( u < 128 ){
+		if( u < SEQ_ASCII_MAX ){
 			if( !(self->seq.ascii[SEQ_ASCII_INDEX(*txt)] & SEQ_ASCII_BIT(*txt)) ) break;
 		}
 		else{
@@ -442,15 +445,16 @@ __private void seq_ctor(sequences_s* seq){
 
 __private void seq_add(sequences_s* seq, ucs4_t st, ucs4_t en){
 	dbg_info("seq add %u-%u", st, en);
-	if( st < 128 ){
-		if( en > 127 ){
+	if( st < SEQ_ASCII_MAX ){
+		if( en >= SEQ_ASCII_MAX ){
 			range_s* r = vector_push(&seq->range, NULL);
-			r->start = 128;
+			r->start = SEQ_ASCII_MAX;
 			r->end   = en;
-			en = 127;
+			en = SEQ_ASCII_MAX-1;
 		}
 		for( ucs4_t a = st; a <= en; ++a ){
 			unsigned i = SEQ_ASCII_INDEX(a);
+			//dbg_info("[%u]|%u", i, SEQ_ASCII_BIT(a));
 			seq->ascii[i] |= SEQ_ASCII_BIT(a);
 		}
 		seq->asciiset = 1;
@@ -466,14 +470,14 @@ __private int range_cmp(const void* a, const void* b){ return ((range_s*)a)->sta
 
 __private void seq_merge(sequences_s* seq, unsigned disableline){	
 	if( seq->reverse && seq->asciiset ){
-		for( unsigned i = 0; i < 4; ++i ){
+		for( unsigned i = 0; i < SEQ_ASCII_LUT; ++i ){
 			seq->ascii[i] = ~seq->ascii[i];
 		}
 	}
 
 	if( !disableline ){
 		unsigned i = SEQ_ASCII_INDEX('\n');
-		seq->ascii[i] &= ~SEQ_ASCII_BIT('n');
+		seq->ascii[i] &= ~SEQ_ASCII_BIT('\n');
 	}
 
 	if( !vector_count(&seq->range) ) return;
@@ -504,6 +508,8 @@ __private state_s* state_dot(regex_t* rx, state_s* s, const utf8_t** rxu8){
 		seq_add(&s->seq, '\n'+1, UINT32_MAX);
 	}
 	
+	s->fn = seq_ascii_range_cmp_fn;
+	mem_gift(s->seq.range, rx);
 	*rxu8 += 1;
 	return s;
 }
@@ -569,7 +575,7 @@ __private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8,
 
 	seq_merge(&s->seq, rx->flags & REGEX_FLAG_DISALBLE_LINE);
 	if( s->seq.asciiset ){
-		s->fn = vector_count(&s->seq.range) ? s->fn = seq_ascii_range_cmp_fn : seq_ascii_cmp_fn;
+		s->fn = vector_count(&s->seq.range) ? seq_ascii_range_cmp_fn : seq_ascii_cmp_fn;
 	}
 	else{
 		s->fn = seq_range_cmp_fn;
@@ -597,7 +603,7 @@ __private const utf8_t* backref_index_cmp_fn(state_s* self, dict_t* cap, const u
 	if( g->type == G_UNSET ) return NULL;
 	unsigned match = 0;
 	do{
-		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
+		if( self->lazy && match >= self->quantifier.n && self->lazy->fn(self->lazy, cap, txt)) return txt;
 		if( strncmp(g->sub.start, (const char*)(txt), g->sub.size) ) return NULL;
 		++match;
 		txt += g->sub.size;
@@ -677,69 +683,39 @@ __private const utf8_t* group_state_walk(state_s* s, const unsigned count, dict_
 }
 
 __private const utf8_t* group_state_or(state_s** s, const unsigned count, dict_t* cap, const utf8_t* txt){
-	for( unsigned or = 0; or < count && txt; ++or ){
-		txt = group_state_walk(s[or], vector_count(&s), cap, txt);
+	const utf8_t* begin = txt;
+	for( unsigned or = 0; or < count; ++or ){
+		txt = group_state_walk(s[or], vector_count(&s), cap, begin);
+		if( txt ) return txt;
 	}
-	return txt;
+	return NULL;
 }
 
 __private const utf8_t* group_cmp_fn(state_s* self, dict_t* cap, const utf8_t* txt){
 	unsigned match = 0;
 	const unsigned orcount = vector_count(&self->group.state);
-	const utf8_t* stmatch;
-	const utf8_t* mmatch = NULL;
+	const utf8_t* stmatch = NULL;
+	const utf8_t* enmatch = txt;
 	do{
 		if( self->lazy && match >= self->quantifier.n &&  self->lazy->fn(self->lazy, cap, txt)) return txt;
-		stmatch = txt;
 		txt = group_state_or(self->group.state, orcount, cap, txt);
 		if( !txt ) break;
+		stmatch = enmatch;
+		enmatch = txt;
 		++match;
-		mmatch = stmatch;
 	}while( match <= self->quantifier.m );
 	if( match < self->quantifier.n ) return NULL;
-	if( mmatch ){
-		generic_s* gc = self->group.name ? dict(cap, (const char*)self->group.name) : dict(cap, self->group.id);
-		gc->type = G_SUB;
-		gc->sub.start = mmatch;
-		gc->sub.size  = txt - mmatch;
-	}
-	return txt;
-}
-
-/*
-__private void make_reverse(regex_t*rx, state_s* state, unsigned count){
-	iassert(count);
-	state[count-1].quantifier.greedy = 1;
-	while( count --> 0 ){
-		_fn lazy = state[count].quantifier.greedy ? NULL : state[count+1].fn;
-
-		switch( state[count].type ){
-			case RX_SINGLE:
-				state[count].fn = make_fn_single_cmp(rx, state[count].u, &state->quantifier, lazy);
-			break;
-
-			case RX_STRING:
-				state[count].fn = make_fn_string_cmp(rx, state[count].string, utf8_bytes_count(state[count].string));
-			break;
-
-			case RX_BACKREF:
-				state[count].fn = make_fn_backref_cmp(rx, &state[count].backref, &state[count].quantifier, lazy);
-			break;
-
-			case RX_SEQUENCES:
-				state[count].fn = make_fn_sequences_cmp(rx, &state[count].seq, &state[count].quantifier, lazy);
-			break;
-
-			case RX_GROUP:
-				foreach_vector(state[count].group.state, ior){
-					make_reverse(rx, state[count].group.state[ior], vector_count(&state[count].group.state[ior]));
-				}
-				state[count].fn = make_fn_group_cmp(rx, &state[count].group, &state[count].quantifier, lazy);
-			break;
+	if( stmatch ){
+		if( self->group.flags & GROUP_FLAG_CAPTURE ){
+			generic_s* gc = self->group.name ? dict(cap, (const char*)self->group.name) : dict(cap, self->group.id);
+			gc->type = G_SUB;
+			gc->sub.start = stmatch;
+			gc->sub.size  = enmatch - stmatch;
 		}
+		return enmatch;
 	}
+	return NULL;
 }
-*/
 
 __private int state_group_flags(const utf8_t** rxu8, utf8_t** name, unsigned* flags, const char** err){
 	if( **rxu8 != '?' ) return 0;
@@ -919,27 +895,30 @@ __private void dump_ch(ucs4_t ch){
 }
 
 __private int check_ascii(sequences_s* seq, ucs4_t ch){
-	unsigned i = ch & 7;
-	return seq->ascii[i] & ( 1 << (ch>>3)) ? 1 : 0;
+	unsigned i = SEQ_ASCII_INDEX(ch);
+	//dbg_info("(%u)[%u]&%u=%u", ch, i, SEQ_ASCII_BIT(ch), seq->ascii[i] & SEQ_ASCII_BIT(ch));
+	return seq->ascii[i] & SEQ_ASCII_BIT(ch) ? 1 : 0;
 }
 
 __private void dump_seq(sequences_s* seq){
 	printf("[");
-	unsigned a = 0;
-	while( a < 256 ){
-		while( a < 256 && !check_ascii(seq, a) ) ++a;
-		if( a >= 256 ) break;
-		unsigned st = a++;
-		while( a < 256 && check_ascii(seq, a) ) ++a;
-		unsigned en = a-1;
-		dbg_info("range %u-%u", st, en);
-		dump_ch(st);
-		if( st != en ){
-			putchar('-');
-			dump_ch(en);
+	if( seq->asciiset ){
+		unsigned a = 0;
+		while( a < 128 ){
+			while( a < 128 && !check_ascii(seq, a) ) ++a;
+			if( a >= 128 ) break;
+			unsigned st = a++;
+			while( a < 128 && check_ascii(seq, a) ) ++a;
+			unsigned en = a-1;
+			dbg_info("range %u-%u", st, en);
+			dump_ch(st);
+			if( st != en ){
+				putchar('-');
+				dump_ch(en);
+			}
 		}
 	}
-	
+
 	iassert(seq->range);
 	foreach_vector(seq->range, i){
 		dump_ch(seq->range[i].start);

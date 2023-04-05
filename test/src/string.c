@@ -97,18 +97,18 @@ int main(){
 	if( cap ) mem_free(cap);
 	*/
 
-	const utf8_t* rx = U8("ciao");
+	const utf8_t* rx = U8("[A-Z]+");
 	regex_t* r = regex_build(rx, 0);
 	if( regex_error(r) ){
 		regex_error_show(r);
 		return 1;
 	}
 
-	dict_t* cap = match_at(r, U8("ciao"), NULL);
+	dict_t* cap = match_at(r, U8("CIao"), NULL);
 	if( cap ){
 		generic_s* m;
 		if( (m=dict(cap, 0))->type == G_SUB ){
-			printf("match[0]: %.*s\n", m->sub.size, (char*)m->sub.start);
+			printf("match[0](%u): %.*s\n", m->sub.size, m->sub.size, (char*)m->sub.start);
 		}
 		mem_free(cap);
 	}

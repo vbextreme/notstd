@@ -18,7 +18,7 @@
 #define REGEX_ERR_ASPECTED_SEQUENCES      "aspected sequences"
 #define REGEX_ERR_UNTERMINATED_GROUP_NAME "unterminated group name"
 #define REGEX_ERR_NUMERICAL_OUT_OF_RANGE  strerror(ERANGE)
-
+#define REGEX_ERR_NOTSTARTED_WITH_SLASH   "need start regex with /"
 #define REGEX_FLAG_DISALBLE_LINE 0x01
 
 typedef struct regex regex_t;
