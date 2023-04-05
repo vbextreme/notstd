@@ -117,7 +117,6 @@ typedef struct string{
 
 #define GROUP_FLAG_CAPTURE     0x01
 #define GROUP_FLAG_COUNT_RESET 0x02
-#define GROUP_FLAG_NAMED       0x04
 
 typedef struct group{
 	unsigned  flags;
@@ -724,49 +723,42 @@ __private int state_group_flags(const utf8_t** rxu8, utf8_t** name, unsigned* fl
 
 	dbg_info("group flags");
 
-	//check if is multi flags
-	const utf8_t* ufs = *rxu8;
-	const utf8_t* ufe = *rxu8;
-	while( *ufe && *ufe != ')' && *ufe != ':' ) ++ufe;
-	ufe = *ufe == ':' ? ufe+1 : ufs + 1;
-
 	//parsing flags;
 	const utf8_t* n = NULL;
-	unsigned l = 0;
 
-	while( ufs < ufe ){
-		switch( *ufs ){
+	while( **rxu8 ){
+		dbg_info("check flags:%c", **rxu8);
+		switch( **rxu8 ){
 			case '|': *flags |= GROUP_FLAG_COUNT_RESET; break;
 			case ':': *flags &= ~GROUP_FLAG_CAPTURE; break;
 			case '\'': case '<':
-				n = ++ufs;
-				while( *ufs && *ufs != '>' && *ufs !='\'' ) ++ufs;
-				if( *ufs != '<' && *ufs != '\'' ){
+				++(*rxu8);
+				n = *rxu8;
+				while( **rxu8 && **rxu8 != '>' && **rxu8 !='\'' ) ++(*rxu8);
+				if( !**rxu8 ){
 					*rxu8 = n-1;
 					*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
 					return -1;
 				}
-				*flags |= GROUP_FLAG_NAMED;
-				l = ufs - n;
+				*name = utf8_dup(n, *rxu8-n);
+				dbg_info("flags name: %s", *name);
 			break;
 
-			default: break;
+			default: return 0;
 		}
-		++ufs;
+		++(*rxu8);
 	}
-
-	if( n ) *name = utf8_dup(n, l);
 	
-	return 0;
+	*err = REGEX_ERR_UNTERMINATED_GROUP;
+	return -1;
 }
 
 __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, const utf8_t** rxu8, const char** err){
 	s->type = RX_GROUP;
 	unsigned flags;
-	const utf8_t* u8 = *rxu8;
 	unsigned gc = *grpcount;
 	unsigned gs = gc;
-	const utf8_t* stgr = u8;
+	const utf8_t* stgr = *rxu8;
 
 	s->group.id   = gc;
 	s->group.name = NULL;
@@ -775,6 +767,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 
 	if( state_group_flags(rxu8, &s->group.name, &flags, err) ) return NULL;
 	if( s->group.name ) mem_gift(s->group.name, rx);
+	const utf8_t* u8 = *rxu8;
 
 	state_s** state = VECTOR(state_s*, 4);
 	unsigned or = 0;
