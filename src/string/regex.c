@@ -3,13 +3,16 @@
 #include <notstd/vector.h>
 #include <notstd/str.h>
 
+//TODO
+// // get segfault on lazy, probably need return error if not pass regex
+
 /* perl regex:
 	Escape	                                          - partiale
-		\t tab - ok                                   - ok
-		\n newline - ok                               - ok
-		\r         - not support                      - not support
-		\f form feed - not support                    - not support
-		\a alarm (bell) - not support                 - not support
+		\t tab                                        - ok
+		\n newline                                    - ok
+		\r                                            - not support
+		\f form feed                                  - not support
+		\a alarm (bell)                               - not support
 		\e escape                                     - not support
 		\cK control char                              - not support
 		\x{}, \x00  hexadecimal char                  - not support
@@ -146,6 +149,8 @@ typedef struct rxch{
 	uint32_t nb;
 }rxch_s;
 
+#define REGEX_FLAG_DISALBLE_LINE 0x01
+
 struct regex{
 	state_s       state;
 	utf8_t*       ff;
@@ -158,7 +163,7 @@ struct regex{
 __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 	rxch_s ch;
 	unsigned escaped = 0;
-	if( !*u8 ){
+	if( !u8[0] || u8[0] == '/' ){
 		ch.code = 0;
 		ch.nb = 0;
 		return ch;
@@ -168,6 +173,7 @@ __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 		escaped = 1;
 		++u8;
 		switch( *u8 ){
+			case 'r': ch.code = str_to_ucs4("\r"); ch.nb = 2; return ch;
 			case 'n': ch.code = str_to_ucs4("\n"); ch.nb = 2; return ch;
 			case 't': ch.code = str_to_ucs4("\t"); ch.nb = 2; return ch;
 			case 'u':
@@ -202,21 +208,22 @@ __private int parse_quantifier(quantifier_s* q, const utf8_t** rxu8, const char*
 
 	const utf8_t* u8 = *rxu8;
 	switch( *u8 ){
+		case '}': *err = REGEX_ERR_UNOPENED_QUANTIFIERS; return -1;
+				  
 		default : q->n = 1; q->m = 1; break;
 		case '?': q->n = 0, q->m = 1; ++u8; break;
 		case '*': q->n = 0, q->m = UINT32_MAX; ++u8; break;
 		case '+': q->n = 1, q->m = UINT32_MAX; ++u8; break;
 		case '{':
 			u8 = (const utf8_t*)str_skip_h((const char*)(u8+1));
-			if( !*u8 || *u8 == '}' ){
-				*err = REGEX_ERR_UNTERMINATED_QUANTIFIER;
-				return -1;
-			}
-
 			if( *u8 == ',' ){
 				q->n = 0;
 			}
 			else{
+				if( !*u8 || *u8 == '/' ){
+					*err = REGEX_ERR_UNTERMINATED_QUANTIFIER;
+					return -1;
+				}
 				const utf8_t* end;
 				int e;
 				q->n = utf8_toul(u8, &end, 10, &e);
@@ -234,6 +241,10 @@ __private int parse_quantifier(quantifier_s* q, const utf8_t** rxu8, const char*
 					q->m = UINT32_MAX;
 				}
 				else{
+					if( !*u8 || *u8 == '/' ){
+						*err = REGEX_ERR_UNTERMINATED_QUANTIFIER;
+						return -1;
+					}
 					const utf8_t* end;
 					int e;
 					q->m = utf8_toul(u8, &end, 10, &e);
@@ -297,38 +308,50 @@ __private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, co
 	unsigned size = 9;
 	utf8_t* str = MANY(utf8_t, size);
 	unsigned len  = 0;
+	unsigned nb = 0;
+	rxch_s   ch = { .code = 0, .nb = 0};
 
 	s->type = RX_STRING;
 	s->fn   = string_cmp_fn;
 
-	while( *u8 && *u8 != '(' && *u8 != ')' && *u8 != '[' && *u8 != ']' && *u8 != '|' ){
+	while( *u8 && *u8 != '/' && *u8 != '(' && *u8 != ')' && *u8 != '[' && *u8 != ']' && *u8 != '|' ){
 		if( u8[0] == '\\' && (u8[1] == 'g' || (u8[1] >= '0' && u8[1] <= '9')) ) break;
+		if( *u8 == '?' || *u8 == '+' || *u8 == '*' || *u8 == '{' ){
+			if( len ){
+				u8 -= ch.nb;
+				len -= nb;
+			}
+			break;
+		}
 
-		rxch_s ch = parse_get_ch(u8, err);
+		ch = parse_get_ch(u8, err);
 		if( ch.nb == UINT32_MAX ){
 			mem_free(str);
 			*rxu8 = u8;
 			return NULL;
 		}
 		u8 += ch.nb;
-	
-		if( *u8 == '?' || *u8 == '+' || *u8 == '*' || *u8 == '{' ) break;
 
 		if( len >= size - 5 ){
 			size *= 2;
 			str = RESIZE(utf8_t, str, size);
 		}
-		len += ucs4_to_utf8(ch.code, &str[len]);
+		nb = ucs4_to_utf8(ch.code, &str[len]);
+		len += nb;
+	}
+
+	if( !len ){
+		mem_free(str);
+		*err = REGEX_ERR_ASPECTED_STRING;
+		return NULL;
 	}
 
 	str[len] = 0;
 	str = RESIZE(utf8_t, str, len+1);
-	
 	s->str.str = str;
 	s->str.len = len;
 	mem_gift(str, rx);
 	*rxu8 = u8;
-
 	dbg_info("state string '%s'", s->str.str);
 	return s;
 }
@@ -523,7 +546,7 @@ __private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8,
 	const utf8_t* u8 = *rxu8;
 	++u8;
 
-	if( !*u8 ){
+	if( !*u8 || *u8 == '/' ){
 		mem_free(s->seq.range);
 		*err = REGEX_ERR_UNTERMINATED_SEQUENCES;
 		return NULL;
@@ -534,7 +557,7 @@ __private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8,
 		++u8;
 	}
 
-	while( *u8 && *u8 != ']' ){
+	while( *u8 && *u8 != '/' && *u8 != ']' ){
 		ucs4_t st;
 		ucs4_t en;
 		rxch_s ch = parse_get_ch(u8, err);
@@ -549,7 +572,8 @@ __private state_s* state_sequences(regex_t* rx, state_s* s, const utf8_t** rxu8,
 		if( u8[0] == '-' && u8[1] != ']' ){
 			++u8;
 			rxch_s ch = parse_get_ch(u8, err);
-			if( ch.nb == UINT32_MAX ){
+			if( !ch.code ){
+				if( ch.nb != UINT32_MAX ) *err = REGEX_ERR_UNTERMINATED_SEQUENCES;
 				mem_free(s->seq.range);
 				*rxu8 = u8;
 				return NULL;
@@ -640,7 +664,7 @@ __private state_s* state_backreferences(regex_t* rx, state_s* s, const utf8_t** 
 		}
 		const utf8_t* n = *rxu8+1;
 		const utf8_t* u8 = n;
-		while( *u8 && *u8 != '}' ) ++u8;
+		while( *u8 && *u8 != '/' && *u8 != '}' ) ++u8;
 		if( *u8 != '}' ){
 			*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
 			return NULL;
@@ -729,13 +753,15 @@ __private int state_group_flags(const utf8_t** rxu8, utf8_t** name, unsigned* fl
 	while( **rxu8 ){
 		dbg_info("check flags:%c", **rxu8);
 		switch( **rxu8 ){
+			case 0  :
+			case '/': *err = REGEX_ERR_UNTERMINATED_GROUP; return -1;
 			case '|': *flags |= GROUP_FLAG_COUNT_RESET; break;
 			case ':': *flags &= ~GROUP_FLAG_CAPTURE; break;
 			case '\'': case '<':
 				++(*rxu8);
 				n = *rxu8;
-				while( **rxu8 && **rxu8 != '>' && **rxu8 !='\'' ) ++(*rxu8);
-				if( !**rxu8 ){
+				while( **rxu8 && **rxu8 != '/' && **rxu8 != '>' && **rxu8 !='\'' ) ++(*rxu8);
+				if( !**rxu8 || **rxu8 == '/' ){
 					*rxu8 = n-1;
 					*err = REGEX_ERR_UNTERMINATED_GROUP_NAME;
 					return -1;
@@ -775,7 +801,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	vector_push(&state, &tmp);
 	state_s* current;
 
-	while( *u8 ){
+	while( *u8 && *u8 != '/' ){
 		dbg_info("parsing:'%s'", (char*)u8);
 		switch( *u8 ){
 			case '.':
@@ -821,7 +847,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 				mem_gift(state[or], rx);
 				mem_gift(state, rx);
 			return s;
-
+			
 			case ']': *err = REGEX_ERR_UNOPENED_SEQUENCES; goto ONERR;
 			case '}': *err = REGEX_ERR_UNOPENED_QUANTIFIERS; goto ONERR;
 	
@@ -836,7 +862,8 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 					rxch_s ch   = parse_get_ch(u8, err);
 					if( ch.nb == UINT32_MAX ) goto ONERR;
 					rxch_s next = parse_get_ch(u8+ch.nb, err);
-					if( next.code == 0 || next.code == '?' || next.code == '+' || next.code == '*' || next.code == '{' ){
+					const utf8_t* nx = u8+ch.nb;
+					if( next.code == 0 || *nx == '?' || *nx == '+' || *nx == '*' || *nx == '{' ){
 						if( !state_single(rx, current, &u8, ch) ) goto ONERR;
 						if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
 					}
@@ -977,7 +1004,31 @@ __private int parse_state(regex_t* rx, const utf8_t* regstr){
 	rx->last = regstr;
 	unsigned gc = 0;
 	state_ctor(&rx->state);
+	if( *rx->last != '/' ){
+		rx->err = REGEX_ERR_ASPECTED_REGEX;
+		return -1;
+	}
+	++rx->last;
 	return state_group(rx, &rx->state, &gc, &rx->last, &rx->err) ? 0 : -1;
+}
+
+__private int parse_flags(regex_t* rx){
+	if( *rx->last != '/' ){
+		rx->err = REGEX_ERR_UNTERMINATED_REGEX;
+		rx->last = rx->rx;
+		return -1;
+	}
+	++rx->last;
+	rx->flags = 0;
+	while( *rx->last ){
+		switch( *rx->last ){
+			case 'l': rx->flags |= REGEX_FLAG_DISALBLE_LINE; break;
+			default: rx->err = REGEX_ERR_UNSUPPORTED_FLAG; return -1;
+		}
+		++rx->last;
+	}
+
+	return 0;
 }
 
 __private void set_lazy(state_s* s){
@@ -1044,10 +1095,10 @@ __private const char* parse_fast_find(utf8_t** vff, state_s* s){
 	return NULL;
 }
 
-regex_t* regex(const utf8_t* regstr, unsigned flags){
+regex_t* regexu(const utf8_t* regstr){
 	regex_t* rx = NEW(regex_t);
-	rx->flags = flags;
 	if( parse_state(rx, regstr) ) return rx;
+	if( parse_flags(rx) ) return rx;
 	set_lazy(&rx->state);
 	rx->ff  = VECTOR(utf8_t, 8);
 	rx->err = parse_fast_find(&rx->ff, &rx->state);
@@ -1055,6 +1106,10 @@ regex_t* regex(const utf8_t* regstr, unsigned flags){
 	mem_gift(rx->ff, rx);
 	dump_state(rx);
 	return rx;
+}
+
+regex_t* regex(const char* regstr){
+	return regexu(U8(regstr));
 }
 
 const char* regex_error(regex_t* rx){
@@ -1067,28 +1122,48 @@ void regex_error_show(regex_t* rx){
 	err_showline((const char*)rx->rx, (const char*)rx->last, 0);
 }
 
-dict_t* match_at(regex_t* rx, const utf8_t* str, const utf8_t** next){
+const utf8_t* regex_get(regex_t* rx){
+	return rx->rx;
+}
+
+dict_t* match_at(regex_t* rx, const utf8_t** str){
 	if( rx->err ) return NULL;
+	if( !*str || !**str ) return NULL;
+
 	dict_t* cap = dict_new();
-	const utf8_t* res = rx->state.fn(&rx->state, cap, str);
-	if( next ) *next = res;
+	*str = rx->state.fn(&rx->state, cap, *str);
+	if( !*str ){
+		mem_free(cap);
+		cap = NULL;
+	}
 	return cap;
 }
 
-dict_t* match(regex_t* rx, const utf8_t* str, const utf8_t** next){
+dict_t* matchu(regex_t* rx, const utf8_t** str){
 	if( rx->err ) return NULL;
+	if( !*str || !**str ) return NULL;
 
-	const utf8_t* f = str;
+	const utf8_t* f = *str;
 	dict_t* cap = dict_new();
 	const utf8_t* res;
 
-	while( *(f = utf8_anyof(f, rx->ff)) && !(res=rx->state.fn(&rx->state, cap, f)) );
+	dbg_info("ff('%s','%s')", f, rx->ff );
+	while( *(f = utf8_anyof(f, rx->ff)) && !(res=rx->state.fn(&rx->state, cap, f)) ){
+		dbg_info("  ff = '%s'", f);
+		++f;
+		dbg_info("ff('%s', '%s')", f, rx->ff );
+	}
+	dbg_info("  ff = '%s'", f);
+	dbg_info("match:%s", res ? "true" : "false");
+	if( !res ) DELETE(cap);
+	*str = res;
 	
-	if( next ) *next = res;	
 	return cap;
 }
 
-
+dict_t* match(regex_t* rx, const char** str){
+	return matchu(rx, (const utf8_t**)str);
+}
 
 
 
