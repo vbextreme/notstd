@@ -506,6 +506,12 @@ const utf8_t* utf8_find_ucs4_range(const utf8_t* u, size_t rangeSt, size_t range
 	return u;
 }
 
+int ucs4_validate(ucs4_t u4){
+	utf8_t u8[5];
+	ucs4_to_utf8(u4, u8);
+	return utf8_validate(u8);
+}
+
 int utf8_ncmp(const utf8_t* a, const utf8_t* b, unsigned n){
 	return memcmp(a, b, n);
 }

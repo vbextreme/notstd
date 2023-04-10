@@ -22,6 +22,7 @@
     <<< What do you know about THE QUICK BROWN FOX?
 	[0] THE QUICK BROWN FOX
 
+#abcd \t \n \r \f \a \e \071 \x3b \$ \\ \? caxyz
 /abcd\t\n\r\f\a\e\071\x3b\$\\\?caxyz/
 	<<< abcd\t\n\r\f\a\e9;\$\\?caxyz
 	[0] abcd\x09\x0a\x0d\x0c\x07\x1b9;$\?caxyz

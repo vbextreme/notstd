@@ -201,4 +201,86 @@ unsigned long str_toul(const char* str, const char** end, unsigned base, int* er
 	return ret;
 }
 
+__private int escape_num(const char* str, unsigned* i, unsigned base){
+	int e;
+	const char* next;
+	int code = str_toul(&str[*i], &next, base, &e);
+	if( e ) return -1;
+	*i = next - &str[*i];
+	return code;
+}
+
+char* str_escape_decode(const char* str, unsigned len){
+	if( !len ) len = strlen(str);
+	char* out = MANY(char, len+1);
+	unsigned i = 0;
+	unsigned o = 0;
+	unsigned q = 0;
+	int ch;
+
+	while( i < len ){
+		if( str[i] == '\\' ){
+			++i;
+			switch( str[i] ){
+				case 't': out[o++] = '\t'; break;
+				case 'n': out[o++] = '\n'; break;
+				case 'r': out[o++] = '\r'; break;
+				case 'f': out[o++] = '\f'; break;
+				case 'a': out[o++] = '\a'; break;
+				case 'e': out[o++] = 27;   break;
+				case 'x':
+					++i;
+					if( str[i] == '{' ){ q = 1; ++i; }
+					else{ q = 0; }
+					ch = escape_num(str, &i, 16);
+					if( ch == -1 ) goto ONERR;
+					if( q ){
+						if( str[i] == '}' ){ ++i; }
+						else{ goto ONERR; }
+					}
+					if( ch > 127 ) goto ONERR;
+					out[o++] = ch;
+				break;
+
+				case 'o':
+					++i;
+					if( str[i] != '{' ) goto ONERR;
+					++i;
+					ch = escape_num(str, &i, 8);
+					if( str[i] != '}' ) goto ONERR;
+					if( ch > 127 ) goto ONERR;
+					out[o++] = ch;
+				break;
+
+				case '0':
+					ch = escape_num(str, &i, 8);
+					if( ch == -1 || ch > 127 ) goto ONERR;
+					out[o++] = ch;
+				break;
+
+				default: out[o++] = str[i++]; break;
+			}
+		}
+		else{
+			out[o++] = str[i++];
+		}
+	}
+
+	return out;
+ONERR:
+	mem_free(out);
+	return NULL;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 

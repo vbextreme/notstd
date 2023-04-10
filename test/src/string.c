@@ -4,7 +4,7 @@
 #include <notstd/map.h>
 #include <notstd/delay.h>
 
-//todo test utf8_anyof think have some problems
+//TODO escape_decode >input string
 
 /*
 	test match:
@@ -46,13 +46,13 @@ __private void test_build(void){
 	testing_build("/ciao[a-z]}/", REGEX_ERR_UNOPENED_QUANTIFIERS, 0);
 	testing_build("/ciao[a-z]{1}}/", REGEX_ERR_UNOPENED_QUANTIFIERS, 0);
 
-	testing_build("/ciao\\up/", REGEX_ERR_INVALID_UTF_ESCAPE, 0);
-	testing_build("/ciao[\\up]/", REGEX_ERR_INVALID_UTF_ESCAPE, 0);
+	testing_build("/ciao\\up/", REGEX_ERR_INVALID_ESCAPE_VALUE, 0);
+	testing_build("/ciao[\\up]/", REGEX_ERR_INVALID_ESCAPE_VALUE, 0);
 
 	testing_build("/ciao\\g{a123456789b123456789c123456789/", REGEX_ERR_UNTERMINATED_GROUP_NAME, 0);
 	testing_build("/ciao\\ga1234567}/", REGEX_ERR_UNOPENED_BACKREF_NAME, 0);
 
-	testing_build("/ciao\\0123456789101234566789201234567893012345678940/", REGEX_ERR_NUMERICAL_OUT_OF_RANGE, 0);
+	testing_build("/ciao\\123456789101234566789201234567893012345678940/", REGEX_ERR_NUMERICAL_OUT_OF_RANGE, 0);
 
 	testing_build("/(ciao)(abcde/", REGEX_ERR_UNTERMINATED_GROUP, 0);
 	testing_build("/(ciao)abc)de/", REGEX_ERR_UNOPENED_GROUP, 0);
@@ -197,19 +197,30 @@ __private void test_match_try(testmatch_s* tm){
 		const char* txt = tm->onmatch[i].test;
 		dbg_info("test match: '%s'", txt);
 		dict_t* cap = match(tm->rex, &txt);
-		if( !cap ) die("test '%s' aspected any results but return no match", tm->onmatch[i].test);
+		if( !cap ){
+			puts("");
+			die("test '%s' aspected any results but return no match", tm->onmatch[i].test);
+		}
 
 		foreach_vector(tm->onmatch[i].results, r){
 			generic_s* g = dict(cap, r);
-			if( g->type != G_SUB ) 
+			if( g->type != G_SUB ){
+				puts("");
 				die("test '%s' aspected [%lu] '%s' but return unset", tm->onmatch[i].test, r, tm->onmatch[i].results[r]);
-			if( strlen(tm->onmatch[i].results[r]) != g->sub.size ) 
+			}
+			if( strlen(tm->onmatch[i].results[r]) != g->sub.size ){
+				puts("");
 				die("test '%s' aspected [%lu] '%s' but return '%.*s'", tm->onmatch[i].test, r, tm->onmatch[i].results[r], g->sub.size, (char*)g->sub.start);
-			if( strncmp(tm->onmatch[i].results[r], g->sub.start, g->sub.size) ) 
+			}
+			if( strncmp(tm->onmatch[i].results[r], g->sub.start, g->sub.size) ) {
+				puts("");
 				die("test '%s' aspected [%lu] '%s' but return '%.*s'", tm->onmatch[i].test, r, tm->onmatch[i].results[r], g->sub.size, (char*)g->sub.start);
+			}
 		}
-		if( dict_count(cap) != vector_count(&tm->onmatch[i].results) )
+		if( dict_count(cap) != vector_count(&tm->onmatch[i].results) ){
+			puts("");
 			die("ascpected %lu cap but get %lu cap", vector_count(&tm->onmatch[i].results), dict_count(cap));
+		}
 		mem_free(cap);
 	}
 
@@ -220,9 +231,11 @@ __private void test_match_try(testmatch_s* tm){
 		if( cap ){
 			generic_s* g = dict(cap,0);
 			if( g->type != G_SUB ){
+				puts("");
 				die("test '%s' aspected unmatch but return unset", tm->unmatch[i]);
 			}
 			else{
+				puts("");
 				die("test '%s' aspected unmatch but return '%.*s'", tm->unmatch[i], g->sub.size, (char*)g->sub.start);
 			}
 			mem_free(cap);

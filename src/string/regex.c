@@ -3,22 +3,28 @@
 #include <notstd/vector.h>
 #include <notstd/str.h>
 
-//TODO
-// // get segfault on lazy, probably need return error if not pass regex
+/*
+	/regex/flags
+		flags:
+		l                                             - disable line mode - ok
+		i                                             - case insensitive  - not support, todo add tolower fn
+		u                                             - utf8              - partial, todo add ascii fn now always utf8 active
+		c                                             - continue          - not support, todo return vector of dict
+*/
 
 /* perl regex:
 	Escape	                                          - partiale
 		\t tab                                        - ok
 		\n newline                                    - ok
-		\r                                            - not support
-		\f form feed                                  - not support
-		\a alarm (bell)                               - not support
-		\e escape                                     - not support
+		\r                                            - ok
+		\f form feed                                  - ok
+		\a alarm (bell)                               - ok
+		\e escape                                     - ok
 		\cK control char                              - not support
-		\x{}, \x00  hexadecimal char                  - not support
+		\x{}, \x00  hexadecimal char                  - ok
 		\N{name}    named Unicode char                - not support
 		\N{U+263D}  Unicode character                 - supported with \U
-		\o{}, \000  octal char                        - not support
+		\o{}, \000  octal char                        - ok
 		\l          lowercase next char               - not support
 		\u          uppercase next char               - not support
 		\L          lowercase until \E                - not support
@@ -160,8 +166,25 @@ struct regex{
 	unsigned      flags;
 };
 
+__private rxch_s parse_escape_num(const utf8_t* u8, unsigned base, __out const char** err){
+	int e;
+	const utf8_t* next;
+	rxch_s ch;
+	ch.code = utf8_toul(u8, &next, base, &e);
+	if( e ){
+		*err = REGEX_ERR_INVALID_ESCAPE_VALUE;
+		ch.code = 0;
+		ch.nb = UINT32_MAX;
+	}
+	else{
+		ch.nb = next - u8;
+	}
+	return ch;
+}
+
 __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 	rxch_s ch;
+	unsigned q = 0;
 	unsigned escaped = 0;
 	if( !u8[0] || u8[0] == '/' ){
 		ch.code = 0;
@@ -176,21 +199,62 @@ __private rxch_s parse_get_ch(const utf8_t* u8, __out const char** err){
 			case 'r': ch.code = str_to_ucs4("\r"); ch.nb = 2; return ch;
 			case 'n': ch.code = str_to_ucs4("\n"); ch.nb = 2; return ch;
 			case 't': ch.code = str_to_ucs4("\t"); ch.nb = 2; return ch;
+			case 'f': ch.code = str_to_ucs4("\f"); ch.nb = 2; return ch;
+			case 'a': ch.code = str_to_ucs4("\a"); ch.nb = 2; return ch;
+			case 'e': ch.code = str_to_ucs4("\e"); ch.nb = 2; return ch;
+			case 'x':
+				++u8;
+				if( *u8 == '{' ){ q = 1; ++u8; }
+				else{ q = 0; }
+				ch = parse_escape_num(u8, 16, err);
+				if( q ){
+					if( *u8 == '}' ){ ++u8; }
+					else{
+						ch.code = 0;
+						ch.nb = UINT32_MAX;
+						*err = REGEX_ERR_INVALID_ESCAPE_VALUE;
+					}
+				}
+				if( ch.code > 127 ){
+					ch.code = 0;
+					ch.nb = UINT32_MAX;
+					*err = REGEX_ERR_INVALID_ESCAPE_VALUE;
+				}
+			return ch;
+
+			case 'o':
+				++u8;
+				if( *u8 != '{' ) goto OCTERR;
+				++u8;
+				ch = parse_escape_num(u8, 8, err);
+				if( *u8 != '}' ) goto OCTERR;
+				if( ch.code > 127 ) goto OCTERR;
+			return ch;
+			OCTERR:
+				ch.code = 0;
+				ch.nb = UINT32_MAX;
+				*err = REGEX_ERR_INVALID_ESCAPE_VALUE;
+			return ch;
+
+			case '0':
+				ch = parse_escape_num(u8, 8, err);
+				if( ch.code > 127 ){
+					ch.code = 0;
+					ch.nb = UINT32_MAX;
+					*err = REGEX_ERR_INVALID_ESCAPE_VALUE;
+				}
+			return ch;
+		
 			case 'u':
 			case 'U':{
 				dbg_info("escaping unicode");
 				++u8;
 				if( *u8 == '+' ) ++u8;
-				int e;
-				const utf8_t* next;
-				ch.code = utf8_toul(u8, &next, 16, &e);
-				if( e ){
-					*err = REGEX_ERR_INVALID_UTF_ESCAPE;
+				ch = parse_escape_num(u8, 16, err);
+				if( !ucs4_validate(ch.code) ){
 					ch.code = 0;
 					ch.nb = UINT32_MAX;
-				}
-				else{
-					ch.nb = next - u8;
+					*err = REGEX_ERR_INVALID_UNICODE;
 				}
 				return ch;
 			}
@@ -315,7 +379,7 @@ __private state_s* state_string(regex_t* rx, state_s* s, const utf8_t** rxu8, co
 	s->fn   = string_cmp_fn;
 
 	while( *u8 && *u8 != '/' && *u8 != '(' && *u8 != ')' && *u8 != '[' && *u8 != ']' && *u8 != '|' ){
-		if( u8[0] == '\\' && (u8[1] == 'g' || (u8[1] >= '0' && u8[1] <= '9')) ) break;
+		if( u8[0] == '\\' && (u8[1] == 'g' || (u8[1] >= '1' && u8[1] <= '9')) ) break;
 		if( *u8 == '?' || *u8 == '+' || *u8 == '*' || *u8 == '{' ){
 			if( len ){
 				u8 -= ch.nb;
@@ -853,7 +917,7 @@ __private state_s* state_group(regex_t* rx, state_s* s, unsigned* grpcount, cons
 	
 			default :
 				current = state_ctor(vector_push(&state[or], NULL));
-				if( u8[0] == '\\' && ((u8[1] >= '0' && u8[1] <= '9') || (u8[1] == 'g')) ){
+				if( u8[0] == '\\' && ((u8[1] >= '1' && u8[1] <= '9') || (u8[1] == 'g')) ){
 					dbg_info("escape is a back references");
 					if( !state_backreferences(rx, current, &u8, err) ) goto ONERR;
 					if( parse_quantifier(&current->quantifier, &u8, err) ) goto ONERR;
@@ -909,8 +973,14 @@ __private void dump_ch(ucs4_t ch){
 	switch( ch ){
 		case '\t': printf("\\t"); break;
 		case '\n': printf("\\n"); break;
-		case  0 ... 8: 
-		case 11 ... 31:
+		case '\r': printf("\\r"); break;
+		case '\f': printf("\\f"); break;
+		case '\a': printf("\\a"); break;
+		case 27  : printf("\\e"); break;
+		case 8        :
+		case 0 ... 6  :
+		case 14 ... 26:
+		case 28 ... 31:
 		case 127 ... UINT32_MAX:
 			printf("\\u%u", ch); 
 		break;
@@ -968,7 +1038,7 @@ __private void state_dump(state_s* state, unsigned count){
 	for( unsigned i = 0 ; i < count; ++i ){
 		switch( state[i].type ){
 			case RX_SINGLE   : dump_ch(state[i].u); break;
-			case RX_STRING   : printf("%s", state[i].str.str); break;
+			case RX_STRING   : printf("%s", state[i].str.str); continue;
 			case RX_BACKREF  : dump_backref(&state[i].backref); break;
 			case RX_SEQUENCES: dump_seq(&state[i].seq); break;
 			case RX_GROUP    :
@@ -1009,6 +1079,10 @@ __private int parse_state(regex_t* rx, const utf8_t* regstr){
 		return -1;
 	}
 	++rx->last;
+	if( !*rx->last || *rx->last == '/' ){
+		rx->err = REGEX_ERR_ASPECTED_REGEX;
+		return -1;
+	}
 	return state_group(rx, &rx->state, &gc, &rx->last, &rx->err) ? 0 : -1;
 }
 

@@ -33,7 +33,7 @@ void str_del(char* dst, size_t len);
 char* quote_printable_decode(size_t *len, const char* str);
 long str_tol(const char* str, const char** end, unsigned base, int* err);
 unsigned long str_toul(const char* str, const char** end, unsigned base, int* err);
-
+char* str_escape_decode(const char* str, unsigned len);
 
 
 char* _itoa (unsigned long long int value, char *buflim, unsigned int base, int upper_case);

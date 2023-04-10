@@ -6,7 +6,8 @@
 #include <notstd/dict.h>
 
 #define REGEX_ERR_INTERNAL                "internal error"
-#define REGEX_ERR_INVALID_UTF_ESCAPE      "invalid utf escape"
+#define REGEX_ERR_INVALID_ESCAPE_VALUE    "invalid escape value"
+#define REGEX_ERR_INVALID_UNICODE         "invalud unicode"
 #define REGEX_ERR_UNOPENED_SEQUENCES      "unopened sequences"
 #define REGEX_ERR_UNOPENED_GROUP          "unopened group"
 #define REGEX_ERR_UNOPENED_QUANTIFIERS    "unopened quantifiers"

@@ -97,6 +97,7 @@ int utf8_validate(const utf8_t* u);
 ucs4_t utf8_to_ucs4(const utf8_t* u);
 ucs4_t str_to_ucs4(const char* str);
 size_t ucs4_to_utf8(ucs4_t ch, utf8_t* u);
+int ucs4_validate(ucs4_t u4);
 const utf8_t* utf8_find_ucs4_range(const utf8_t* u, size_t rangeSt, size_t rangeEn);
 
 int utf8_ncmp(const utf8_t* a, const utf8_t* b, unsigned n);
